@@ -20,7 +20,7 @@ NekoTool 不负责 USB 采集。它只做一件事：把 **StatusCast** 已经�
 输出示例：
 
 ```text
-📱 主力机 | 🔋 87% ⚡ | 🎵 Yesterday - The Beatles | 🖥 33% | 🧠 63% | 🌐 ↓1.2M ↑86K | 🕐 21:41
+📱 主力机 | 🔋 87% ⚡ | 🎵 Yesterday - The Beatles | 🖥 33% | 🧠 63% | 🌐 ↓1.2M ↑86K | 🕐 21:53 | 🌤 晴 25℃
 ```
 
 如果想让 CPU / 内存 / 网速也使用固定演示值，加上 `-MockHardware`：
@@ -37,25 +37,34 @@ NekoTool 不负责 USB 采集。它只做一件事：把 **StatusCast** 已经�
 
 脚本会自动调用 Edge / Chrome 无头模式，把 `web/preview-mock.png` 生成出来。
 
-## 为什么单独做一个仓库？
+## v3.0 生态架构
 
-StatusCast 的职责是“稳定采集 + 提供本地 API”：
-
-```text
-iPhone --USB--> StatusCast --> http://localhost:5099/status/
-```
-
-NekoTool 的职责是“消费和再加工”：
+StatusCast 只负责底层采集和标准 JSON API：
 
 ```text
-                    ┌─ pull_status.ps1 ──▶ NekoTrak 基础状态
-StatusCast API ─────┤
-                    ├─ ultimate_status.ps1 ──▶ 手机 + CPU + 内存 + 网速 + 时间
-                    ├─ write_to_obs.ps1 ──▶ OBS 文本源读取的 txt
-                    └─ widget.html ──▶ OBS 浏览器源挂件
+iPhone --USB--> status_core.py ─┐
+Android --ADB--> status_core_android.py ─┤
+                                         ▼
+                               StatusCast HTTP API
+                               localhost:5099/status/
 ```
 
-这样采集端和展示端可以独立演进，不用为了一个 OBS 小挂件去改 C# 或 Python。
+NekoTool 负责所有聚合、插件和展示：
+
+```text
+StatusCast API ──▶ 手机状态
+Windows CIM ─────▶ CPU / 内存 / 网速
+plugins/*.ps1 ───▶ 天气 / 温度 / 自定义状态
+        │
+        ▼
+  ultimate_status.ps1
+        │
+        ├─▶ NekoTrak 文本
+        ├─▶ write_to_obs.ps1 → obs_status.txt → OBS 文本源
+        └─▶ widget.html → OBS 浏览器源
+```
+
+这样核心保持纯净，展示层可以独立演进。
 
 ## 目录结构
 
@@ -67,10 +76,12 @@ NekoTool/
 ├─ obs_status.txt                 # write_to_obs.ps1 运行时生成，不提交
 ├─ scripts/
 │  ├─ pull_status.ps1             # 基础版：只读手机状态
-│  ├─ ultimate_status.ps1         # 终极版：缝合手机 + CPU + 内存 + 网速 + 时间
+│  ├─ ultimate_status.ps1         # 终极版：手机 + 系统 + 插件
 │  ├─ write_to_obs.ps1            # OBS 专用：循环写入本地 txt
-│  ├─ mock_data.json              # StatusCast v2 模拟数据
+│  ├─ mock_data.json              # StatusCast 模拟数据
 │  └─ generate_preview.ps1        # 无头浏览器生成预览图
+├─ plugins/
+│  └─ weather_mock.ps1            # 示例插件：返回一行天气
 └─ web/
    ├─ widget.html                 # OBS 浏览器源挂件
    ├─ preview-mock.png            # README 预览图
@@ -195,6 +206,58 @@ file:///G:/NekoTool/web/widget.html?url=http://127.0.0.1:5099/status/
 
 浏览器源每 2 秒拉取一次状态；API 不可用时会显示 `OFFLINE`，不会卡住 OBS。
 
+## NekoTool 插件机制
+
+NekoTool 的插件就是独立的 PowerShell 脚本。把 `.ps1` 放进 `plugins/`，
+`ultimate_status.ps1` 会自动遍历执行，每个插件只需要返回一段短文本。
+
+```text
+plugins/
+├─ weather_mock.ps1
+├─ cpu_temp.ps1
+└─ my_service.ps1
+```
+
+### 编写一个插件
+
+创建 `plugins/hello.ps1`：
+
+```powershell
+Write-Output "👋 NekoTool"
+```
+
+运行：
+
+```powershell
+.\scripts\ultimate_status.ps1 -MockMode -MockHardware
+```
+
+输出末尾会自动追加：
+
+```text
+... | 👋 NekoTool
+```
+
+### 插件约定
+
+- 每个插件只输出 **一行短文本**；
+- 不要等待用户输入；
+- 不要修改 `plugins/` 之外的文件；
+- 默认超过 **2 秒** 会被停止并跳过；
+- 插件报错不会影响主流程；
+- 可用 `-PluginTimeoutSeconds` 调整超时时间。
+
+### 带参数的插件
+
+插件本身是普通 `.ps1`，可以直接读取环境变量或调用 API：
+
+```powershell
+$response = Invoke-RestMethod -Uri "https://wttr.in/?format=3" -TimeoutSec 2
+Write-Output "🌤 $response"
+```
+
+如果天气服务失败，脚本会报错；NekoTool 会跳过它并继续输出手机和系统状态。
+
 ## NekoTrak 接入
 
 ### 基础状态
@@ -240,6 +303,7 @@ ${(Invoke-RestMethod -Uri 'http://localhost:5099/status/' -UseBasicParsing).text
 | `-SampleSeconds` | `1.0` | 网速采样时长，范围 0.2–5 秒 |
 | `-MockMode` | 关闭 | 从 `scripts/mock_data.json` 读取手机状态，不请求 API |
 | `-MockHardware` | 关闭 | CPU / 内存 / 网速使用固定演示值 |
+| `-PluginTimeoutSeconds` | `2` | 单个插件超时时间，范围 1–30 秒 |
 
 ### generate_preview.ps1
 

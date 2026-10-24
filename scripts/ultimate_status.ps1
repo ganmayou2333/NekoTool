@@ -25,7 +25,9 @@ param(
     [ValidateRange(0.2, 5.0)]
     [double]$SampleSeconds = 1.0,
     [switch]$MockMode,
-    [switch]$MockHardware
+    [switch]$MockHardware,
+    [ValidateRange(1, 30)]
+    [int]$PluginTimeoutSeconds = 2
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -33,6 +35,43 @@ $ErrorActionPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 $OutputEncoding = [Console]::OutputEncoding
 
+
+function Format-DeviceText {
+    param($Device)
+
+    if ($null -eq $Device) {
+        return '📱 -- | 🔋 -- | 🎵 --'
+    }
+
+    $icon = if ($Device.platform -eq 'android') { '🤖' } else { '📱' }
+    $name = if ($Device.displayName) { $Device.displayName }
+        elseif ($Device.model) { $Device.model }
+        else { '未知机型' }
+
+    if ($null -eq $Device.batteryLevel) {
+        $battery = '🔋 未知'
+    }
+    elseif ($Device.isCharging -eq $true) {
+        $battery = "🔋 $($Device.batteryLevel)% ⚡"
+    }
+    else {
+        $battery = "🔋 $($Device.batteryLevel)%"
+    }
+
+    if ($Device.mediaTitle) {
+        $media = if ($Device.mediaArtist) {
+            "🎵 $($Device.mediaTitle) - $($Device.mediaArtist)"
+        }
+        else {
+            "🎵 $($Device.mediaTitle)"
+        }
+    }
+    else {
+        $media = '🎵 暂无播放'
+    }
+
+    return "$icon $name | $battery | $media"
+}
 
 function Get-MockPhoneText {
     $mockPath = Join-Path $PSScriptRoot 'mock_data.json'
@@ -51,8 +90,11 @@ function Get-MockPhoneText {
             $primary = $devices | Select-Object -First 1
         }
 
-        if ($null -ne $primary -and $primary.text) {
-            return [string]$primary.text
+        if ($null -ne $primary) {
+            if ($primary.text) {
+                return [string]$primary.text
+            }
+            return Format-DeviceText $primary
         }
     }
     catch {
@@ -64,6 +106,31 @@ function Get-MockPhoneText {
 function Get-PhoneText {
     try {
         $status = Invoke-RestMethod -Uri $StatusUrl -UseBasicParsing -TimeoutSec 5
+
+        # StatusCast v3: only a devices array is guaranteed.
+        if ($null -ne $status.devices) {
+            $devices = @($status.devices)
+            $primary = $devices |
+                Where-Object { $_.platform -eq 'ios' -and $null -ne $_.batteryLevel } |
+                Select-Object -First 1
+            if ($null -eq $primary) {
+                $primary = $devices |
+                    Where-Object { $null -ne $_.batteryLevel } |
+                    Select-Object -First 1
+            }
+            if ($null -eq $primary) {
+                $primary = $devices | Select-Object -First 1
+            }
+
+            if ($null -ne $primary) {
+                if ($primary.text) {
+                    return [string]$primary.text
+                }
+                return Format-DeviceText $primary
+            }
+        }
+
+        # Backward compatibility with StatusCast <= v2.
         if ($status.text) {
             return [string]$status.text
         }
@@ -72,6 +139,50 @@ function Get-PhoneText {
     }
 
     return '📱 -- | 🔋 -- | 🎵 --'
+}
+
+function Get-PluginTexts {
+    $pluginDirectory = Join-Path (Split-Path -Parent $PSScriptRoot) 'plugins'
+    if (-not (Test-Path -LiteralPath $pluginDirectory)) {
+        return @()
+    }
+
+    $texts = @()
+    $scripts = Get-ChildItem -LiteralPath $pluginDirectory -Filter '*.ps1' -File |
+        Sort-Object Name
+
+    foreach ($script in $scripts) {
+        $job = $null
+        try {
+            $job = Start-Job -ScriptBlock {
+                param($pluginPath)
+                & $pluginPath
+            } -ArgumentList $script.FullName
+
+            $finished = Wait-Job -Job $job -Timeout $PluginTimeoutSeconds
+            if ($null -ne $finished) {
+                $output = Receive-Job -Job $job -ErrorAction SilentlyContinue
+                $line = @($output |
+                    ForEach-Object { ([string]$_).Trim() } |
+                    Where-Object { $_ }) |
+                    Select-Object -First 1
+                if ($line) {
+                    $texts += $line
+                }
+            }
+        }
+        catch {
+            # Bad plugins are isolated and skipped.
+        }
+        finally {
+            if ($null -ne $job) {
+                Stop-Job -Job $job -ErrorAction SilentlyContinue
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    return $texts
 }
 
 function Get-CpuPercent {
@@ -173,6 +284,15 @@ else {
 }
 
 $clock = Get-Date -Format 'HH:mm'
+$pluginTexts = Get-PluginTexts
 
-Write-Output ("{0} | 🖥 {1} | 🧠 {2} | {3} | 🕐 {4}" -f `
-        $phone, (Format-Percent $cpu), (Format-Percent $memory), $network, $clock)
+$parts = @(
+    $phone,
+    "🖥 $(Format-Percent $cpu)",
+    "🧠 $(Format-Percent $memory)",
+    $network,
+    "🕐 $clock"
+)
+$parts += $pluginTexts
+
+Write-Output ($parts -join ' | ')

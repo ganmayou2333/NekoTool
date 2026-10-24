@@ -36,13 +36,6 @@
       "text": "🤖 备用机 | 🔋 42% | 🎵 晴天 - 周杰伦"
     }
   ],
-  "plugins": [
-    {
-      "name": "Clock",
-      "status": "🕐 21:23:47",
-      "error": null
-    }
-  ],
   "battery": {
     "level": 87,
     "isCharging": true,
