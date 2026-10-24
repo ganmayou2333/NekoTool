@@ -1,4 +1,4 @@
-﻿# NekoTool v3.2 plugin: latest heart rate collected by scripts/hr_collector.py.
+﻿# NekoTool v3.2 plugin: latest heart rate collected by collectors/hr_collector.py.
 # The collector writes data/heart_rate.json; a reading is shown only while its
 # timestamp is less than 10 seconds old, otherwise "❤️ --".
 $ErrorActionPreference = 'SilentlyContinue'

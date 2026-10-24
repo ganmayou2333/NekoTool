@@ -16,12 +16,12 @@ back to ``❤️ --``.
 Install the one dependency and start it in a separate terminal::
 
     pip install websocket-client
-    python scripts/hr_collector.py
+    python collectors/hr_collector.py
 
 Useful options::
 
-    python scripts/hr_collector.py --url ws://127.0.0.1:8406/chat
-    python scripts/hr_collector.py --output data/heart_rate.json
+    python collectors/hr_collector.py --url ws://127.0.0.1:8406/chat
+    python collectors/hr_collector.py --output data/heart_rate.json
 """
 
 from __future__ import annotations
