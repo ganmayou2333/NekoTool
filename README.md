@@ -143,7 +143,7 @@ NekoTool 本身不需要 Python、.NET 或管理员权限。
 `setup.ps1` 会提示选择 `StatusCast.Daemon.exe`，保存为 `config.ps1`，并生成：
 
 ```text
-${(powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\NekoTool\scripts\launch_and_pull.ps1")}
+${(powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\StatusCast\NekoTool\scripts\launch_and_pull.ps1")}
 ```
 
 之后 NekoTrak 每次刷新都会自动检测并启动 StatusCast，不需要手动打开。
@@ -225,7 +225,7 @@ NekoTool\obs_status.txt
 在 OBS 中添加 **浏览器** 源，选择：
 
 ```text
-G:\NekoTool\web\widget.html
+G:\StatusCast\NekoTool\web\widget.html
 ```
 
 建议尺寸：
@@ -322,23 +322,23 @@ NekoTool 可以在 StatusCast 没打开时自动把它拉起来，再返回状�
 `launch_and_pull.ps1` 会优先读取 `setup.ps1` 生成的 `config.ps1`。也可以手动覆盖路径：
 
 ```powershell
-$env:STATUSCAST_ROOT = 'G:\StatusCast'
-$env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast.Daemon.exe'
+$env:STATUSCAST_ROOT = 'G:\StatusCast\StatusCast'
+$env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast\dist\StatusCast.Daemon.exe'
 ```
 
 也可以直接传参：
 
 ```powershell
 .\scripts\launch_and_pull.ps1 `
-  -StatusCastRoot 'G:\StatusCast' `
-  -StatusCastExe 'G:\StatusCast\StatusCast.Daemon.exe' `
+  -StatusCastRoot 'G:\StatusCast\StatusCast' `
+  -StatusCastExe 'G:\StatusCast\StatusCast\dist\StatusCast.Daemon.exe' `
   -TimeoutSeconds 5
 ```
 
 NekoTrak 中使用：
 
 ```text
-{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\NekoTool\scripts\launch_and_pull.ps1"}
+{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\StatusCast\NekoTool\scripts\launch_and_pull.ps1"}
 ```
 
 ## NekoTrak 接入
@@ -354,19 +354,19 @@ ${(Invoke-RestMethod -Uri 'http://localhost:5099/status/' -UseBasicParsing).text
 或调用脚本：
 
 ```text
-{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\NekoTool\scripts\pull_status.ps1"}
+{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\StatusCast\NekoTool\scripts\pull_status.ps1"}
 ```
 
 ### 终极缝合状态
 
 ```text
-{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\NekoTool\scripts\ultimate_status.ps1"}
+{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\StatusCast\NekoTool\scripts\ultimate_status.ps1"}
 ```
 
 如果 NekoTrak 的刷新间隔比较短，建议使用 `-SampleSeconds 0.5`，避免每次采样占用太久：
 
 ```text
-{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\NekoTool\scripts\ultimate_status.ps1" -SampleSeconds 0.5}
+{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\StatusCast\NekoTool\scripts\ultimate_status.ps1" -SampleSeconds 0.5}
 ```
 
 ## 脚本参数
