@@ -37,6 +37,11 @@ function Write-Banner {
 }
 
 function Find-DefaultExe {
+    $packagedExe = Join-Path $projectRoot 'StatusCast.Daemon.exe'
+    if (Test-Path -LiteralPath $packagedExe -PathType Leaf) {
+        return $packagedExe
+    }
+
     if ($env:STATUSCAST_EXE -and (Test-Path -LiteralPath $env:STATUSCAST_EXE)) {
         return (Resolve-Path -LiteralPath $env:STATUSCAST_EXE).Path
     }

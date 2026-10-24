@@ -81,6 +81,7 @@ NekoTool/
 │  ├─ ultimate_status.ps1         # 终极版：手机 + 系统 + 插件
 │  ├─ write_to_obs.ps1            # OBS 专用：循环写入本地 txt
 │  ├─ launch_and_pull.ps1         # 看门狗：自动启动 StatusCast 后取数
+│  ├─ build_release.ps1           # 一键打包 StatusCast + NekoTool
 │  ├─ mock_data.json              # StatusCast 模拟数据
 │  └─ generate_preview.ps1        # 无头浏览器生成预览图
 ├─ plugins/
@@ -89,6 +90,39 @@ NekoTool/
    ├─ widget.html                 # OBS 浏览器源控制台
    └─ preview-mock.png            # README 预览图
 ```
+
+## 构建可分发包
+
+```powershell
+.\scripts\build_release.ps1
+```
+
+默认生成免安装 .NET 运行时的自包含单文件包：
+
+```text
+StatusCast_v3.1.0_Release.zip
+```
+
+也可以生成更小的框架依赖包：
+
+```powershell
+.\scripts\build_release.ps1 -SelfContained:$false
+```
+
+发布包解压后：
+
+```text
+StatusCast.Daemon.exe
+status_core.py
+status_core_android.py
+start.bat
+setup.ps1
+scripts/
+web/
+plugins/
+```
+
+双击 `start.bat` 静默启动 daemon；首次使用可运行 `setup.ps1` 配置 NekoTrak 命令。
 
 ## 环境要求
 

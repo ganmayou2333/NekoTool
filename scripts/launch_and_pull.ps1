@@ -118,6 +118,12 @@ function Find-StatusCastExe {
         return (Resolve-Path -LiteralPath $env:STATUSCAST_EXE).Path
     }
 
+    # A release zip places the daemon next to scripts/ and web/.
+    $packagedExe = Join-Path $projectRoot 'StatusCast.Daemon.exe'
+    if (Test-Path -LiteralPath $packagedExe -PathType Leaf) {
+        return (Resolve-Path -LiteralPath $packagedExe).Path
+    }
+
     $root = Find-StatusCastRoot -ExplicitRoot $StatusCastRoot
     if (-not $root) {
         return $null

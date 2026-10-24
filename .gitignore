@@ -10,3 +10,6 @@ desktop.ini
 .preview-mock.html
 
 config.ps1
+
+publish/
+StatusCast_v*_Release.zip
