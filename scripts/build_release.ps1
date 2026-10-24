@@ -19,7 +19,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = '3.2.0',
+    [string]$Version = '3.3.0',
     [bool]$SelfContained = $true,
     [string]$StatusCastRoot = '',
     [string]$OutputDirectory = ''

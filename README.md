@@ -76,13 +76,13 @@ NekoTool/
 ├─ config.ps1                     # setup.ps1 生成，不提交
 ├─ requirements.txt               # 可选：心率采集器依赖 websocket-client
 ├─ collectors/
-│  └─ hr_collector.py             # v3.2 心率 WebSocket 采集器
+│  └─ hr_collector.py             # v3.3 心率 WebSocket 采集器
 ├─ data/
 │  ├─ .gitkeep
 │  └─ heart_rate.json             # hr_collector.py 运行时生成，不提交
 ├─ plugins/
 │  ├─ weather.ps1                 # 示例插件：返回一行天气
-│  └─ heart_rate.ps1              # v3.2 心率插件：❤️ <bpm> BPM
+│  └─ heart_rate.ps1              # v3.3 心率插件：❤️ <bpm> BPM
 ├─ scripts/
 │  ├─ setup.ps1                   # 一键交互式配置
 │  ├─ update.ps1                  # 版本检查 / git pull
@@ -107,7 +107,7 @@ NekoTool/
 默认生成免安装 .NET 运行时的自包含单文件包：
 
 ```text
-StatusCast_v3.2.0_Release.zip
+StatusCast_v3.3.0_Release.zip
 ```
 
 也可以生成更小的框架依赖包：
@@ -134,7 +134,9 @@ requirements-nekotool.txt
 
 双击 `start.bat` 静默启动 daemon；首次使用可运行 `setup.ps1` 配置 NekoTrak 命令。
 
-## 检查更新（v3.2）
+## 检查更新（v3.3.0）
+
+### 手动检查
 
 ```powershell
 # 只检查，不修改文件
@@ -147,8 +149,20 @@ requirements-nekotool.txt
 - 优先读取 GitHub Release，仓库还没有 Release 时回退到最新 Commit；
 - 当前目录是 git 仓库时执行 `git fetch`，落后时 `git pull --ff-only`；
 - 拉取成功后用青色打印最近 3 条 `git log -n 3 --oneline`；
-- 下载的 zip 包没有 `.git`，脚本只提示去 GitHub Release 重新下载，不会乱改文件；
-- `launch_and_pull.ps1` 每 **6 小时** 静默调用一次 `-Quiet -AutoUpdate`，不阻塞状态刷新。
+- 下载的 zip 包没有 `.git`，脚本只提示去 GitHub Release 重新下载，不会乱改文件。
+
+### 自动检查
+
+`launch_and_pull.ps1` 每次被 NekoTrak 调用时会先做一次很轻量的时间戳判断，**每 6 小时**最多在后台静默执行一次：
+
+```powershell
+update.ps1 -Quiet -AutoUpdate
+```
+
+- 状态文件：`data/update_check.json`（已忽略，不会提交）；
+- 更新日志：`data/update.log`（已忽略）；
+- 后台进程隐藏运行，不阻塞状态刷新；
+- 如果是 zip 安装，更新脚本只写日志，不会自动改文件。
 
 ## 环境要求
 
@@ -325,7 +339,7 @@ Write-Output "🌤 $response"
 
 如果天气服务失败，脚本会报错；NekoTool 会跳过它并继续输出手机和系统状态。
 
-## 心率插件（v3.2）
+## 心率插件（v3.3.0）
 
 `plugins/heart_rate.ps1` 会读取 `data/heart_rate.json`，只有时间戳在 **10 秒内**才显示：
 
@@ -333,14 +347,29 @@ Write-Output "🌤 $response"
 ... | ❤️ 82 BPM
 ```
 
-数据由 `collectors/hr_collector.py` 从心率软件的 WebSocket 实时写入，默认监听 `ws://localhost:8406/chat`：
+### 1. 安装依赖
 
 ```powershell
-pip install websocket-client
+pip install -r requirements.txt
+```
+
+`requirements.txt` 目前只有 `websocket-client`。需要 Python 3.10+。
+
+### 2. 启动采集器
+
+```powershell
 python .\collectors\hr_collector.py --url ws://localhost:8406/chat
 ```
 
-也可以先 `pip install -r requirements.txt`。采集器兼容 `{"bpm":82}`、`{"heartRate":82}`、`{"data":{"heart_rate":82}}`、纯数字/`"82 bpm"` 等常见格式；断线会自动重连。停止采集 10 秒后，插件自动回落为 `❤️ --`，不会卡住状态栏。
+- 默认地址就是 `ws://localhost:8406/chat`，也可以省略 `--url`；
+- 采集器会断线自动重连，按 Ctrl+C 停止；
+- 可用 `--output data/heart_rate.json` 指定其它写入位置（默认就是它）；
+- 兼容 `{"bpm":82}`、`{"heartRate":82}`、`{"data":{"heart_rate":82}}`、纯数字/`"82 bpm"` 等常见格式；
+- 采集器需要持续运行；如需开机自启，可把它做成任务计划程序或启动项。
+
+### 3. 插件自动生效
+
+`ultimate_status.ps1` 会自动遍历 `plugins/*.ps1`，不需要额外配置。采集器停止或数据超过 10 秒后，插件自动回落为 `❤️ --`，不会卡住状态栏。
 
 `data/heart_rate.json` 示例：
 
@@ -348,7 +377,7 @@ python .\collectors\hr_collector.py --url ws://localhost:8406/chat
 {"bpm": 82, "timestamp": 1792860000.123, "source": "ws://localhost:8406/chat"}
 ```
 
-> 采集器需要 Python 3.10+；它和 NekoTool 主流程解耦，不启动采集器时插件只会输出 `❤️ --`。
+> 如果一直是 `❤️ --`：确认采集器在运行、心率软件 WebSocket 地址正确、`data/heart_rate.json` 的 `timestamp` 是最近 10 秒内的值。
 
 ## 随叫随到：自动启动 StatusCast
 
