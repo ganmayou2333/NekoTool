@@ -83,9 +83,8 @@ NekoTool/
 ├─ plugins/
 │  └─ weather_mock.ps1            # 示例插件：返回一行天气
 └─ web/
-   ├─ widget.html                 # OBS 浏览器源挂件
-   ├─ preview-mock.png            # README 预览图
-   └─ widget-preview.png          # 旧版挂件截图
+   ├─ widget.html                 # OBS 浏览器源控制台
+   └─ preview-mock.png            # README 预览图
 ```
 
 ## 环境要求
@@ -191,7 +190,7 @@ G:\NekoTool\web\widget.html
 建议尺寸：
 
 ```text
-480 × 240
+800 × 300
 ```
 
 背景设为透明，即可得到一个跟随 StatusCast 实时更新的电量圆弧挂件。

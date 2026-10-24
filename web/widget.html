@@ -3,15 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NekoTool · StatusCast Widget</title>
+  <title>NekoTool / StatusCast Console</title>
   <style>
+    /* =========================================================
+       NekoTool Console
+       OBS Browser Source: 800 x 300, transparent background.
+       All colors and spacing are in :root for easy tuning.
+       ========================================================= */
+
     :root {
-      --bg: rgba(12, 17, 30, 0.82);
-      --line: rgba(255, 255, 255, 0.12);
+      --cyan: #22d3ee;
+      --green: #34d399;
+      --gold: #f6c453;
+      --red: #ef4444;
       --text: #f8fafc;
       --muted: #94a3b8;
-      --accent: #22d3ee;
-      --accent-soft: rgba(34, 211, 238, 0.16);
+      --dim: #64748b;
+      --line: rgba(255, 255, 255, 0.12);
+      --glass: rgba(9, 14, 26, 0.58);
+      --glass-soft: rgba(15, 23, 42, 0.46);
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.32);
+    }
+
+    /* Animated battery ring value; Chromium in OBS supports @property. */
+    @property --level {
+      syntax: "<number>";
+      inherits: false;
+      initial-value: 0;
     }
 
     * {
@@ -23,93 +41,246 @@
       width: 100%;
       height: 100%;
       margin: 0;
-      background: transparent;
       overflow: hidden;
-      font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      background: transparent;
       color: var(--text);
+      font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
     }
 
     body {
-      display: grid;
-      place-items: center;
+      display: flex;
+      padding: 12px;
     }
 
-    .widget {
-      width: min(420px, calc(100vw - 20px));
-      padding: 16px 18px;
-      border: 1px solid var(--line);
-      border-radius: 22px;
+    /* Mock/preview only: give the glass something dark to blur.
+       Real OBS usage stays transparent. */
+    body.preview {
       background:
-        radial-gradient(circle at 15% 10%, rgba(34, 211, 238, 0.14), transparent 42%),
-        linear-gradient(135deg, rgba(30, 41, 59, 0.92), rgba(8, 12, 22, 0.9));
-      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+        radial-gradient(circle at 15% 10%, rgba(34, 211, 238, 0.12), transparent 40%),
+        radial-gradient(circle at 85% 90%, rgba(124, 58, 237, 0.1), transparent 45%),
+        #0b1020;
     }
 
-    .top {
+    ::-webkit-scrollbar {
+      display: none;
+    }
+
+    .console {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 9px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    /* Top bar ------------------------------------------------- */
+
+    .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--glass-soft);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
     }
 
     .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
       font-size: 10px;
       font-weight: 700;
-      letter-spacing: 0.18em;
-      color: var(--muted);
+      letter-spacing: 0.16em;
       text-transform: uppercase;
+    }
+
+    .brand strong {
+      color: #fff;
+    }
+
+    .brand span {
+      color: var(--dim);
+      letter-spacing: 0.08em;
+    }
+
+    .top-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 10px;
+      color: var(--muted);
     }
 
     .live {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
       color: var(--muted);
     }
 
-    .dot {
-      width: 7px;
-      height: 7px;
+    .live .dot {
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      background: #64748b;
-      box-shadow: 0 0 0 0 rgba(100, 116, 139, 0.5);
+      background: var(--dim);
+    }
+
+    .live.online {
+      color: var(--green);
     }
 
     .live.online .dot {
-      background: #34d399;
-      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5);
-      animation: pulse 2s infinite;
+      background: var(--green);
+      animation: livePulse 2s infinite;
     }
 
-    .main {
+    .live.mock {
+      color: var(--gold);
+    }
+
+    .live.mock .dot {
+      background: var(--gold);
+      animation: livePulse 2s infinite;
+    }
+
+    /* Main three-column layout -------------------------------- */
+
+    .grid {
+      display: grid;
+      flex: 1;
+      grid-template-columns: minmax(0, 1.55fr) minmax(142px, 0.72fr) minmax(0, 0.93fr);
+      gap: 9px;
+      min-height: 0;
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--glass);
+      backdrop-filter: blur(14px) saturate(1.18);
+      -webkit-backdrop-filter: blur(14px) saturate(1.18);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-head {
       display: flex;
       align-items: center;
-      gap: 16px;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .panel-head .accent {
+      color: var(--cyan);
+    }
+
+    /* Left: device cards -------------------------------------- */
+
+    .devices {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 8px;
+      height: 100%;
+    }
+
+    .device {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      padding: 9px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 13px;
+      background: rgba(2, 6, 23, 0.30);
+    }
+
+    .device-head {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .device-icon {
+      display: grid;
+      flex: 0 0 auto;
+      width: 25px;
+      height: 25px;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(34, 211, 238, 0.12);
+      font-size: 14px;
+    }
+
+    .device.android .device-icon {
+      background: rgba(52, 211, 153, 0.12);
+    }
+
+    .device-name {
+      overflow: hidden;
+      flex: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .bolt {
+      font-size: 12px;
+      animation: boltPulse 1.8s ease-in-out infinite;
+    }
+
+    .device-body {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      gap: 10px;
+      min-height: 0;
+      padding: 5px 0;
     }
 
     .ring {
       --level: 0;
+      --accent: var(--cyan);
       position: relative;
-      flex: 0 0 auto;
-      width: 88px;
-      height: 88px;
-      border-radius: 50%;
-      background: conic-gradient(var(--accent) calc(var(--level) * 1%), rgba(255, 255, 255, 0.08) 0);
       display: grid;
+      flex: 0 0 auto;
+      width: 58px;
+      height: 58px;
       place-items: center;
-      transition: background 0.4s ease;
+      border-radius: 50%;
+      background: conic-gradient(
+        var(--accent) calc(var(--level) * 1%),
+        rgba(255, 255, 255, 0.08) 0
+      );
+      box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
+      transition: --level 0.8s ease, background 0.3s ease;
     }
 
     .ring::before {
-      content: "";
       position: absolute;
-      inset: 8px;
+      inset: 5px;
       border-radius: 50%;
-      background: #0b1120;
-      box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.45);
+      background: #0a1020;
+      box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.55);
+      content: "";
     }
 
     .ring-inner {
@@ -120,215 +291,642 @@
       gap: 1px;
     }
 
-    .level {
-      font-size: 27px;
-      font-weight: 700;
-      letter-spacing: -0.04em;
+    .battery-value {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -0.06em;
+      font-variant-numeric: tabular-nums;
     }
 
-    .percent {
-      font-size: 11px;
+    .unit {
+      font-size: 9px;
       color: var(--muted);
     }
 
-    .info {
+    .device-meta {
+      display: flex;
       min-width: 0;
-      flex: 1;
+      flex-direction: column;
+      gap: 3px;
     }
 
-    .model {
+    .label {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--dim);
+    }
+
+    .state {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 19px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-
-    .battery-line {
-      margin-top: 3px;
-      font-size: 12px;
+      font-size: 10px;
       color: var(--muted);
     }
 
-    .media {
-      margin-top: 12px;
-      padding-top: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    .device-media {
       overflow: hidden;
+      padding-top: 7px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-size: 12px;
-      color: #cbd5e1;
+      font-size: 10px;
+      color: var(--muted);
     }
 
-    .media strong {
-      color: var(--text);
+    .device-media strong {
+      color: #e2e8f0;
       font-weight: 600;
     }
 
-    .footer {
+    .device-app {
+      margin-top: 3px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 9px;
+      color: var(--dim);
+    }
+
+    .empty {
+      display: grid;
+      height: 100%;
+      place-items: center;
+      color: var(--dim);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    /* Middle: system monitor ---------------------------------- */
+
+    .system-panel {
       display: flex;
+      flex-direction: column;
+    }
+
+    .metric {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      min-height: 0;
+    }
+
+    .metric + .metric {
+      margin-top: 4px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .metric-head {
+      display: flex;
+      align-items: baseline;
       justify-content: space-between;
-      margin-top: 11px;
+      font-size: 9px;
+      color: var(--dim);
+    }
+
+    .metric-value {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bar {
+      height: 4px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .bar span {
+      display: block;
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      transition: width 0.6s ease;
+    }
+
+    .metric.memory .bar span {
+      background: linear-gradient(90deg, var(--gold), #fb923c);
+    }
+
+    .metric.network .bar span {
+      background: linear-gradient(90deg, #818cf8, var(--cyan));
+    }
+
+    .metric-value .unit {
+      margin-left: 2px;
+      color: var(--dim);
+      font-size: 8px;
+      font-weight: 500;
+    }
+
+    /* Right: plugin stream ------------------------------------ */
+
+    .plugins-panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .plugin-list {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 5px;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+
+    .plugin-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      padding: 5px 7px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.035);
+      animation: streamIn 0.35s ease both;
+    }
+
+    .plugin-name {
+      flex: 0 0 auto;
+      color: var(--dim);
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .plugin-value {
+      overflow: hidden;
+      flex: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #cbd5e1;
       font-size: 10px;
-      color: #64748b;
     }
 
-    .offline {
-      color: #f87171;
+    .plugin-footer {
+      margin-top: 6px;
+      color: var(--dim);
+      font-size: 8px;
+      letter-spacing: 0.05em;
     }
 
-    @keyframes pulse {
+    @keyframes livePulse {
       0% {
-        box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.45);
+        box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4);
       }
       70% {
-        box-shadow: 0 0 0 7px rgba(52, 211, 153, 0);
+        box-shadow: 0 0 0 5px rgba(52, 211, 153, 0);
       }
       100% {
         box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
       }
     }
+
+    @keyframes boltPulse {
+      0%,
+      100% {
+        opacity: 0.55;
+        transform: scale(0.92);
+      }
+      50% {
+        opacity: 1;
+        transform: scale(1.08);
+      }
+    }
+
+    @keyframes streamIn {
+      from {
+        opacity: 0;
+        transform: translateY(-5px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
 <body>
-  <section class="widget" id="widget">
-    <div class="top">
-      <div class="brand">NekoTool · StatusCast</div>
-      <div class="live" id="live">
-        <span class="dot"></span>
-        <span id="liveText">CONNECTING</span>
+  <main class="console">
+    <!-- Top status strip -->
+    <header class="topbar">
+      <div class="brand">
+        <strong>NEKOTOOL</strong>
+        <span>// STATUSCAST CONSOLE</span>
       </div>
-    </div>
+      <div class="top-meta">
+        <span class="live" id="live">
+          <span class="dot"></span>
+          <span id="liveText">CONNECTING</span>
+        </span>
+        <span id="clock">--:--:--</span>
+      </div>
+    </header>
 
-    <div class="main">
-      <div class="ring" id="ring">
-        <div class="ring-inner">
-          <span class="level" id="level">--</span>
-          <span class="percent">%</span>
+    <section class="grid">
+      <!-- Left: phones -->
+      <div class="panel devices-panel">
+        <div class="panel-head">
+          <span>DEVICES</span>
+          <span class="accent" id="deviceCount">0 ONLINE</span>
+        </div>
+        <div class="devices" id="devices">
+          <div class="empty">等待 StatusCast 数据…</div>
         </div>
       </div>
 
-      <div class="info">
-        <div class="model" id="model">等待状态…</div>
-        <div class="battery-line" id="batteryLine">StatusCast API</div>
-        <div class="media" id="media">🎵 暂无播放</div>
-      </div>
-    </div>
+      <!-- Middle: system metrics (simulated for now) -->
+      <div class="panel system-panel">
+        <div class="panel-head">
+          <span>SYS MONITOR</span>
+          <span class="accent">LOCAL</span>
+        </div>
 
-    <div class="footer">
-      <span id="clock">--:--</span>
-      <span>localhost:5099</span>
-    </div>
-  </section>
+        <div class="metric cpu">
+          <div class="metric-head">
+            <span>CPU</span>
+            <span class="metric-value"><span id="cpuValue">--</span><span class="unit">%</span></span>
+          </div>
+          <div class="bar"><span id="cpuBar"></span></div>
+        </div>
+
+        <div class="metric memory">
+          <div class="metric-head">
+            <span>MEM</span>
+            <span class="metric-value"><span id="memValue">--</span><span class="unit">%</span></span>
+          </div>
+          <div class="bar"><span id="memBar"></span></div>
+        </div>
+
+        <div class="metric network">
+          <div class="metric-head">
+            <span>NET</span>
+            <span class="metric-value"><span id="netValue">--</span><span class="unit">MB/s</span></span>
+          </div>
+          <div class="bar"><span id="netBar"></span></div>
+        </div>
+      </div>
+
+      <!-- Right: plugin output -->
+      <div class="panel plugins-panel">
+        <div class="panel-head">
+          <span>PLUGIN STREAM</span>
+          <span class="accent">LIVE</span>
+        </div>
+        <div class="plugin-list" id="pluginList"></div>
+        <div class="plugin-footer">plugins/*.ps1 → ultimate_status.ps1</div>
+      </div>
+    </section>
+  </main>
 
   <script>
     (() => {
+      "use strict";
+
+      // -------------------------------------------------------
+      // Configuration
+      // -------------------------------------------------------
+      const API_URL = "http://localhost:5099/status/";
+      const POLL_MS = 2000;
+      const SYSTEM_MS = 1400;
+
+      // ?mock=true, or window.__NEKOTOOL_MOCK__ injected by
+      // scripts/generate_preview.ps1, switches to local data.
       const params = new URLSearchParams(location.search);
-      const endpoint = params.get("url") || "http://localhost:5099/status/";
-      const pollMs = 2000;
+      const injectedMock = window.__NEKOTOOL_MOCK__;
+      const mockMode = params.get("mock") === "true" || Boolean(injectedMock);
 
-      const ring = document.getElementById("ring");
-      const level = document.getElementById("level");
-      const model = document.getElementById("model");
-      const batteryLine = document.getElementById("batteryLine");
-      const media = document.getElementById("media");
-      const live = document.getElementById("live");
-      const liveText = document.getElementById("liveText");
-      const clock = document.getElementById("clock");
+      // Built-in demo data for ?mock=true. Shape mirrors StatusCast v3.
+      const BUILTIN_MOCK = {
+        schema: 3,
+        generatedAt: 1792848052,
+        devices: [
+          {
+            id: "iphone",
+            platform: "ios",
+            model: "iPhone15,3",
+            displayName: "主力机",
+            batteryLevel: 87,
+            isCharging: true,
+            mediaTitle: "Yesterday",
+            mediaArtist: "The Beatles",
+            mediaState: "playing",
+            foregroundApp: null,
+            foregroundAppName: null,
+            error: null,
+          },
+          {
+            id: "android",
+            platform: "android",
+            model: "Pixel 7",
+            displayName: "备用机",
+            batteryLevel: 42,
+            isCharging: false,
+            mediaTitle: "晴天",
+            mediaArtist: "周杰伦",
+            mediaState: "playing",
+            foregroundApp: "com.tencent.mm",
+            foregroundAppName: "微信",
+            error: null,
+          },
+        ],
+      };
 
-      const offlineText = "📱 -- | 🔋 -- | 🎵 --";
+      const devicesEl = document.getElementById("devices");
+      const deviceCountEl = document.getElementById("deviceCount");
+      const liveEl = document.getElementById("live");
+      const liveTextEl = document.getElementById("liveText");
+      const clockEl = document.getElementById("clock");
 
-      function setAccent(levelValue) {
-        let accent = "#22d3ee";
-        if (levelValue !== null && levelValue < 20) accent = "#ef4444";
-        else if (levelValue !== null && levelValue >= 80) accent = "#f6c453";
-        document.documentElement.style.setProperty("--accent", accent);
-      }
+      const cpuValueEl = document.getElementById("cpuValue");
+      const cpuBarEl = document.getElementById("cpuBar");
+      const memValueEl = document.getElementById("memValue");
+      const memBarEl = document.getElementById("memBar");
+      const netValueEl = document.getElementById("netValue");
+      const netBarEl = document.getElementById("netBar");
+      const pluginListEl = document.getElementById("pluginList");
 
-      function render(data) {
-        const battery = data && data.battery ? data.battery : {};
-        const mediaData = data && data.media ? data.media : {};
-        const value = Number.isFinite(battery.level) ? Math.max(0, Math.min(100, battery.level)) : null;
-        const text = data && data.text ? data.text : offlineText;
-        const modelText = text.split("|")[0].replace(/^📱\s*/, "").replace(/^🤖\s*/, "").trim() || "未知机型";
+      let currentDevices = [];
+      let previousLevels = new Map();
+      let system = { cpu: 28, memory: 61, network: 1.2 };
+      let pluginEntries = [];
+      let lastStatusOk = false;
 
-        level.textContent = value === null ? "--" : value;
-        ring.style.setProperty("--level", value === null ? 0 : value);
-        setAccent(value);
-
-        model.textContent = modelText;
-
-        const charging = battery.isCharging === true ? " ⚡ 充电中" : "";
-        batteryLine.textContent = value === null
-          ? "USB 设备未连接"
-          : `🔋 ${value}%${charging}`;
-
-        const title = mediaData.title || "";
-        const artist = mediaData.artist || "";
-        if (title) {
-          media.innerHTML = `🎵 <strong>${escapeHtml(title)}</strong>${artist ? ` · ${escapeHtml(artist)}` : ""}`;
-        } else {
-          media.textContent = "🎵 暂无播放";
-        }
-
-        live.classList.add("online");
-        liveText.textContent = "LIVE";
-        clock.textContent = new Date().toLocaleTimeString("zh-CN", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      }
-
-      function renderOffline() {
-        level.textContent = "--";
-        ring.style.setProperty("--level", 0);
-        setAccent(null);
-        model.textContent = "StatusCast 未连接";
-        batteryLine.textContent = "请先启动 StatusCast";
-        media.textContent = "🎵 --";
-        live.classList.remove("online");
-        liveText.textContent = "OFFLINE";
-        clock.textContent = "--:--";
-      }
+      // -------------------------------------------------------
+      // Helpers
+      // -------------------------------------------------------
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
       function escapeHtml(value) {
-        return String(value).replace(/[&<>"']/g, (c) => ({
+        return String(value).replace(/[&<>"']/g, (char) => ({
           "&": "&amp;",
           "<": "&lt;",
           ">": "&gt;",
           '"': "&quot;",
           "'": "&#39;",
-        }[c]));
+        }[char]));
       }
 
-      async function tick() {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 1500);
+      function accentFor(level) {
+        if (level === null) return "#64748b";
+        if (level < 20) return "#ef4444";
+        if (level >= 80) return "#f6c453";
+        return "#22d3ee";
+      }
+
+      function mediaLine(device) {
+        if (!device.mediaTitle) return "🎵 暂无播放";
+        const artist = device.mediaArtist ? ` · ${escapeHtml(device.mediaArtist)}` : "";
+        return `🎵 <strong>${escapeHtml(device.mediaTitle)}</strong>${artist}`;
+      }
+
+      function appLine(device) {
+        if (device.foregroundAppName) return `APP · ${escapeHtml(device.foregroundAppName)}`;
+        if (device.foregroundApp) return `APP · ${escapeHtml(device.foregroundApp)}`;
+        return device.platform === "android" ? "ANDROID · ADB" : "IOS · USB";
+      }
+
+      function animateNumber(element, target) {
+        const from = Number(element.dataset.current || 0);
+        const to = Number(target);
+        if (!Number.isFinite(to) || from === to) {
+          element.textContent = Number.isFinite(to) ? to : "--";
+          element.dataset.current = String(to);
+          return;
+        }
+
+        const start = performance.now();
+        const duration = 550;
+        element.dataset.current = String(to);
+
+        function frame(now) {
+          const progress = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          element.textContent = Math.round(from + (to - from) * eased);
+          if (progress < 1) requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      }
+
+      // -------------------------------------------------------
+      // Device rendering
+      // -------------------------------------------------------
+      function renderDevice(device) {
+        const level = Number.isFinite(device.batteryLevel)
+          ? clamp(Math.round(device.batteryLevel), 0, 100)
+          : null;
+        const platform = device.platform === "android" ? "android" : "ios";
+        const icon = platform === "android" ? "🤖" : "📱";
+        const name = device.displayName || device.model || (platform === "android" ? "Android" : "iPhone");
+        const accent = accentFor(level);
+        const charging = device.isCharging === true;
+        const value = level === null ? "--" : String(level);
+
+        return `
+          <article class="device ${platform}">
+            <div class="device-head">
+              <span class="device-icon">${icon}</span>
+              <span class="device-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+              ${charging ? '<span class="bolt" title="充电中">⚡</span>' : ""}
+            </div>
+            <div class="device-body">
+              <div class="ring" style="--level:${level ?? 0};--accent:${accent}">
+                <div class="ring-inner">
+                  <span class="battery-value" data-current="0">${value}</span>
+                  <span class="unit">%</span>
+                </div>
+              </div>
+              <div class="device-meta">
+                <span class="label">BATTERY</span>
+                <span class="state">${charging ? "CHARGING" : level === null ? "OFFLINE" : "ON BATTERY"}</span>
+              </div>
+            </div>
+            <div class="device-media">${mediaLine(device)}</div>
+            <div class="device-app">${appLine(device)}</div>
+          </article>
+        `;
+      }
+
+      function renderDevices(devices) {
+        currentDevices = devices.filter(Boolean);
+        if (currentDevices.length === 0) {
+          devicesEl.innerHTML = '<div class="empty">等待 StatusCast 数据…</div>';
+          deviceCountEl.textContent = "0 ONLINE";
+          return;
+        }
+
+        devicesEl.innerHTML = currentDevices.map(renderDevice).join("");
+        deviceCountEl.textContent = `${currentDevices.length} ONLINE`;
+
+        // Animate from the previous value, but render the first frame at the
+        // target so previews/screenshots never catch a half-finished number.
+        const nextLevels = new Map();
+        devicesEl.querySelectorAll(".battery-value").forEach((el, index) => {
+          const device = currentDevices[index];
+          if (!device || !Number.isFinite(device.batteryLevel)) return;
+
+          const target = clamp(Math.round(device.batteryLevel), 0, 100);
+          const key = device.id || String(index);
+          const previous = previousLevels.has(key) ? previousLevels.get(key) : target;
+          nextLevels.set(key, target);
+
+          el.dataset.current = String(previous);
+          el.textContent = previous;
+          animateNumber(el, target);
+        });
+        previousLevels = nextLevels;
+      }
+
+      // -------------------------------------------------------
+      // System monitor simulation
+      // -------------------------------------------------------
+      function randomDelta(amount) {
+        return (Math.random() - 0.5) * amount * 2;
+      }
+
+      function renderSystem() {
+        cpuValueEl.textContent = Math.round(system.cpu);
+        memValueEl.textContent = Math.round(system.memory);
+        netValueEl.textContent = system.network.toFixed(1);
+
+        cpuBarEl.style.width = `${clamp(system.cpu, 0, 100)}%`;
+        memBarEl.style.width = `${clamp(system.memory, 0, 100)}%`;
+        netBarEl.style.width = `${clamp((system.network / 10) * 100, 0, 100)}%`;
+      }
+
+      function simulateSystem() {
+        system.cpu = clamp(system.cpu + randomDelta(7), 7, 88);
+        system.memory = clamp(system.memory + randomDelta(1.8), 38, 88);
+        system.network = clamp(system.network + randomDelta(0.7), 0.1, 9.8);
+        renderSystem();
+      }
+
+      // -------------------------------------------------------
+      // Plugin stream (simulated until PowerShell exposes values)
+      // -------------------------------------------------------
+      function renderPlugins() {
+        pluginListEl.innerHTML = pluginEntries.map((item) => `
+          <div class="plugin-item">
+            <span class="plugin-name">${escapeHtml(item.name)}</span>
+            <span class="plugin-value">${escapeHtml(item.value)}</span>
+          </div>
+        `).join("");
+      }
+
+      function refreshPluginEntries() {
+        const now = new Date();
+        const time = now.toLocaleTimeString("zh-CN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const primary = currentDevices[0];
+        const battery = primary && Number.isFinite(primary.batteryLevel)
+          ? `${primary.displayName || primary.model} ${primary.batteryLevel}%`
+          : "--";
+        const android = currentDevices.find((device) => device.platform === "android");
+
+        pluginEntries = [
+          { name: "Clock", value: `🕐 ${time}` },
+          { name: "Weather", value: "🌤 晴 25℃" },
+          { name: "Battery", value: `🔋 ${battery}` },
+        ];
+
+        if (android) {
+          pluginEntries.push({
+            name: "Android",
+            value: `🤖 ${android.foregroundAppName || android.displayName || "online"}`,
+          });
+        }
+
+        renderPlugins();
+      }
+
+      function renderClock() {
+        clockEl.textContent = new Date().toLocaleTimeString("zh-CN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+      }
+
+      // -------------------------------------------------------
+      // Data loading
+      // -------------------------------------------------------
+      function setLive(online, label) {
+        liveEl.classList.toggle("online", online && label === "LIVE");
+        liveEl.classList.toggle("mock", label === "MOCK");
+        liveTextEl.textContent = label;
+      }
+
+      function renderStatus(payload) {
+        const devices = Array.isArray(payload?.devices) ? payload.devices : [];
+        renderDevices(devices);
+        refreshPluginEntries();
+      }
+
+      async function fetchStatus() {
+        if (mockMode) {
+          renderStatus(injectedMock || BUILTIN_MOCK);
+          setLive(true, "MOCK");
+          return;
+        }
 
         try {
-          const response = await fetch(endpoint, {
-            cache: "no-store",
-            signal: controller.signal,
-          });
+          const response = await fetch(API_URL, { cache: "no-store" });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          render(await response.json());
+          const payload = await response.json();
+          renderStatus(payload);
+          lastStatusOk = true;
+          setLive(true, "LIVE");
         } catch {
-          renderOffline();
-        } finally {
-          clearTimeout(timer);
+          if (!lastStatusOk) {
+            renderDevices([]);
+            setLive(false, "OFFLINE");
+          }
         }
       }
 
-      if (window.__NEKOTOOL_MOCK__) {
-        render(window.__NEKOTOOL_MOCK__);
-        setInterval(() => render(window.__NEKOTOOL_MOCK__), 1000);
-        return;
+      // -------------------------------------------------------
+      // Boot
+      // -------------------------------------------------------
+      renderSystem();
+      renderPlugins();
+      renderClock();
+
+      if (mockMode) {
+        document.body.classList.add("preview");
+        renderStatus(injectedMock || BUILTIN_MOCK);
+        setLive(true, "MOCK");
+      } else {
+        fetchStatus();
       }
 
-      tick();
-      setInterval(tick, pollMs);
+      if (!mockMode) {
+        setInterval(fetchStatus, POLL_MS);
+      }
+      setInterval(simulateSystem, SYSTEM_MS);
+      setInterval(refreshPluginEntries, 1000);
+      setInterval(renderClock, 1000);
     })();
   </script>
 </body>

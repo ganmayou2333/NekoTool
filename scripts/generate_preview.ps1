@@ -40,10 +40,7 @@ $mockJson = Get-Content -LiteralPath $mockPath -Raw -Encoding UTF8 |
     ConvertTo-Json -Depth 8 -Compress
 
 $html = [IO.File]::ReadAllText($widgetPath, [Text.Encoding]::UTF8)
-$injection = @"
-<script>window.__NEKOTOOL_MOCK__ = $mockJson;</script>
-<style>html,body{background:#0b1020!important;}</style>
-"@
+$injection = "<script>window.__NEKOTOOL_MOCK__ = $mockJson;</script>"
 
 $previewHtml = $html.Replace("</head>", "$injection`n</head>")
 [IO.File]::WriteAllText($tempHtml, $previewHtml, (New-Object Text.UTF8Encoding($false)))
@@ -57,7 +54,7 @@ try {
         "--hide-scrollbars",
         "--no-first-run",
         "--user-data-dir=$profile",
-        "--window-size=480,240",
+        "--window-size=800,300",
         "--virtual-time-budget=3000",
         "--screenshot=$outputPath",
         $previewUri
