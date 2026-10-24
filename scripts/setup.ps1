@@ -8,7 +8,7 @@
     shortcut for StatusCast.
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 #>
 [CmdletBinding()]
 param(
@@ -17,7 +17,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$projectRoot = $PSScriptRoot
+
+# Source checkout: <root>/scripts/setup.ps1
+# Release package: <root>/setup.ps1
+$scriptDir = $PSScriptRoot
+if ((Split-Path -Leaf $scriptDir) -ieq 'scripts') {
+    $projectRoot = Split-Path -Parent $scriptDir
+}
+else {
+    $projectRoot = $scriptDir
+}
+
 $configPath = Join-Path $projectRoot 'config.ps1'
 $launcher = Join-Path $projectRoot 'scripts\launch_and_pull.ps1'
 

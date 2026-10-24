@@ -1,0 +1,2 @@
+# NekoTool heart-rate collector (collectors/hr_collector.py)
+websocket-client>=1.6,<2

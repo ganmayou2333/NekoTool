@@ -73,19 +73,26 @@ NekoTool/
 ├─ README.md
 ├─ LICENSE
 ├─ .gitignore
-├─ setup.ps1                      # 一键交互式配置
 ├─ config.ps1                     # setup.ps1 生成，不提交
-├─ obs_status.txt                 # write_to_obs.ps1 运行时生成，不提交
-├─ scripts/
-│  ├─ pull_status.ps1             # 基础版：只读手机状态
-│  ├─ ultimate_status.ps1         # 终极版：手机 + 系统 + 插件
-│  ├─ write_to_obs.ps1            # OBS 专用：循环写入本地 txt
-│  ├─ launch_and_pull.ps1         # 看门狗：自动启动 StatusCast 后取数
-│  ├─ build_release.ps1           # 一键打包 StatusCast + NekoTool
-│  ├─ mock_data.json              # StatusCast 模拟数据
-│  └─ generate_preview.ps1        # 无头浏览器生成预览图
+├─ requirements.txt               # 可选：心率采集器依赖 websocket-client
+├─ collectors/
+│  └─ hr_collector.py             # v3.2 心率 WebSocket 采集器
+├─ data/
+│  ├─ .gitkeep
+│  └─ heart_rate.json             # hr_collector.py 运行时生成，不提交
 ├─ plugins/
-│  └─ weather_mock.ps1            # 示例插件：返回一行天气
+│  ├─ weather.ps1                 # 示例插件：返回一行天气
+│  └─ heart_rate.ps1              # v3.2 心率插件：❤️ <bpm> BPM
+├─ scripts/
+│  ├─ setup.ps1                   # 一键交互式配置
+│  ├─ update.ps1                  # 版本检查 / git pull
+│  ├─ launch_and_pull.ps1         # 看门狗：自动启动 StatusCast 后取数
+│  ├─ ultimate_status.ps1         # 终极版：手机 + 系统 + 插件
+│  ├─ pull_status.ps1             # 基础版：只读手机状态
+│  ├─ write_to_obs.ps1            # OBS 专用：循环写入本地 txt
+│  ├─ build_release.ps1           # 一键打包 StatusCast + NekoTool
+│  ├─ generate_preview.ps1        # 无头浏览器生成预览图
+│  └─ mock_data.json              # StatusCast 模拟数据
 └─ web/
    ├─ widget.html                 # OBS 浏览器源控制台
    └─ preview-mock.png            # README 预览图
@@ -100,7 +107,7 @@ NekoTool/
 默认生成免安装 .NET 运行时的自包含单文件包：
 
 ```text
-StatusCast_v3.1.0_Release.zip
+StatusCast_v3.2.0_Release.zip
 ```
 
 也可以生成更小的框架依赖包：
@@ -120,9 +127,28 @@ setup.ps1
 scripts/
 web/
 plugins/
+collectors/
+requirements.txt
+requirements-nekotool.txt
 ```
 
 双击 `start.bat` 静默启动 daemon；首次使用可运行 `setup.ps1` 配置 NekoTrak 命令。
+
+## 检查更新（v3.2）
+
+```powershell
+# 只检查，不修改文件
+.\scripts\update.ps1 -CheckOnly
+
+# 检查并 fast-forward 拉取（仅 git 仓库）
+.\scripts\update.ps1 -AutoUpdate
+```
+
+- 优先读取 GitHub Release，仓库还没有 Release 时回退到最新 Commit；
+- 当前目录是 git 仓库时执行 `git fetch`，落后时 `git pull --ff-only`；
+- 拉取成功后用青色打印最近 3 条 `git log -n 3 --oneline`；
+- 下载的 zip 包没有 `.git`，脚本只提示去 GitHub Release 重新下载，不会乱改文件；
+- `launch_and_pull.ps1` 每 **6 小时** 静默调用一次 `-Quiet -AutoUpdate`，不阻塞状态刷新。
 
 ## 环境要求
 
@@ -131,16 +157,16 @@ plugins/
 - StatusCast 已安装，或已通过 `setup.ps1` 指定 `StatusCast.Daemon.exe`
 - OBS 28+（仅使用 OBS 功能时需要）
 
-NekoTool 本身不需要 Python、.NET 或管理员权限。
+NekoTool 本身不需要 Python、.NET 或管理员权限（可选的心率采集器需要 Python 和 `websocket-client`）。
 
 ## 快速开始
 
 1. 下载 NekoTool 源码；
-2. 右键运行根目录的 `setup.ps1`（或执行 `powershell -ExecutionPolicy Bypass -File .\setup.ps1`）；
+2. 右键运行 `scripts\setup.ps1`（或执行 `powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1`）；
 3. 把剪贴板里的 `${...}` 命令粘贴到 NekoTrak 的自定义文本；
 4. 搞定。
 
-`setup.ps1` 会提示选择 `StatusCast.Daemon.exe`，保存为 `config.ps1`，并生成：
+`scripts/setup.ps1` 会提示选择 `StatusCast.Daemon.exe`，保存为 `config.ps1`，并生成：
 
 ```text
 ${(powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\StatusCast\NekoTool\scripts\launch_and_pull.ps1")}
@@ -253,7 +279,8 @@ NekoTool 的插件就是独立的 PowerShell 脚本。把 `.ps1` 放进 `plugins
 
 ```text
 plugins/
-├─ weather_mock.ps1
+├─ weather.ps1
+├─ heart_rate.ps1
 ├─ cpu_temp.ps1
 └─ my_service.ps1
 ```
@@ -298,6 +325,31 @@ Write-Output "🌤 $response"
 
 如果天气服务失败，脚本会报错；NekoTool 会跳过它并继续输出手机和系统状态。
 
+## 心率插件（v3.2）
+
+`plugins/heart_rate.ps1` 会读取 `data/heart_rate.json`，只有时间戳在 **10 秒内**才显示：
+
+```text
+... | ❤️ 82 BPM
+```
+
+数据由 `collectors/hr_collector.py` 从心率软件的 WebSocket 实时写入，默认监听 `ws://localhost:8406/chat`：
+
+```powershell
+pip install websocket-client
+python .\collectors\hr_collector.py --url ws://localhost:8406/chat
+```
+
+也可以先 `pip install -r requirements.txt`。采集器兼容 `{"bpm":82}`、`{"heartRate":82}`、`{"data":{"heart_rate":82}}`、纯数字/`"82 bpm"` 等常见格式；断线会自动重连。停止采集 10 秒后，插件自动回落为 `❤️ --`，不会卡住状态栏。
+
+`data/heart_rate.json` 示例：
+
+```json
+{"bpm": 82, "timestamp": 1792860000.123, "source": "ws://localhost:8406/chat"}
+```
+
+> 采集器需要 Python 3.10+；它和 NekoTool 主流程解耦，不启动采集器时插件只会输出 `❤️ --`。
+
 ## 随叫随到：自动启动 StatusCast
 
 NekoTool 可以在 StatusCast 没打开时自动把它拉起来，再返回状态。
@@ -319,11 +371,11 @@ NekoTool 可以在 StatusCast 没打开时自动把它拉起来，再返回状�
 - 使用命名 Mutex，避免 NekoTrak 连续刷新时重复启动；
 - 已有进程或 API 已就绪时不会再次启动。
 
-`launch_and_pull.ps1` 会优先读取 `setup.ps1` 生成的 `config.ps1`。也可以手动覆盖路径：
+`launch_and_pull.ps1` 会优先读取 `scripts/setup.ps1` 生成的 `config.ps1`。也可以手动覆盖路径：
 
 ```powershell
 $env:STATUSCAST_ROOT = 'G:\StatusCast\StatusCast'
-$env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast\dist\StatusCast.Daemon.exe'
+$env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast\src\StatusCast.Daemon\bin\Release\net10.0\win-x64\StatusCast.Daemon.exe'
 ```
 
 也可以直接传参：
@@ -331,7 +383,7 @@ $env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast\dist\StatusCast.Daemon.exe'
 ```powershell
 .\scripts\launch_and_pull.ps1 `
   -StatusCastRoot 'G:\StatusCast\StatusCast' `
-  -StatusCastExe 'G:\StatusCast\StatusCast\dist\StatusCast.Daemon.exe' `
+  -StatusCastExe 'G:\StatusCast\StatusCast\src\StatusCast.Daemon\bin\Release\net10.0\win-x64\StatusCast.Daemon.exe' `
   -TimeoutSeconds 5
 ```
 

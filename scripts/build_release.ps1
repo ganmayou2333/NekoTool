@@ -19,7 +19,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = '3.1.0',
+    [string]$Version = '3.2.0',
     [bool]$SelfContained = $true,
     [string]$StatusCastRoot = '',
     [string]$OutputDirectory = ''
@@ -127,12 +127,17 @@ if (Test-Path -LiteralPath $requirements) {
     Copy-Item -LiteralPath $requirements -Destination (Join-Path $publishRoot 'requirements.txt') -Force
 }
 
+$nekotoolRequirements = Join-Path $nekotoolRoot 'requirements.txt'
+if (Test-Path -LiteralPath $nekotoolRequirements) {
+    Copy-Item -LiteralPath $nekotoolRequirements -Destination (Join-Path $publishRoot 'requirements-nekotool.txt') -Force
+}
+
 $statusConfig = Join-Path $statusCastRoot 'config.json'
 if (Test-Path -LiteralPath $statusConfig) {
     Copy-Item -LiteralPath $statusConfig -Destination (Join-Path $publishRoot 'config.json') -Force
 }
 
-foreach ($folder in @('scripts', 'web', 'plugins')) {
+foreach ($folder in @('scripts', 'web', 'plugins', 'collectors')) {
     $source = Join-Path $nekotoolRoot $folder
     if (-not (Test-Path -LiteralPath $source -PathType Container)) {
         throw "缺少 NekoTool 目录：$source"
@@ -140,10 +145,17 @@ foreach ($folder in @('scripts', 'web', 'plugins')) {
     Copy-Item -LiteralPath $source -Destination $publishRoot -Recurse -Force
 }
 
+# The release keeps a single setup.ps1 at the package root; avoid shipping a
+# duplicate copy inside scripts/.
+$packagedScriptsSetup = Join-Path $publishRoot 'scripts\setup.ps1'
+if (Test-Path -LiteralPath $packagedScriptsSetup) {
+    Remove-Item -LiteralPath $packagedScriptsSetup -Force
+}
+
 Copy-Item -LiteralPath (Join-Path $nekotoolRoot 'README.md') -Destination (Join-Path $publishRoot 'README.md') -Force
 Copy-Item -LiteralPath (Join-Path $nekotoolRoot 'LICENSE') -Destination (Join-Path $publishRoot 'LICENSE') -Force
 
-$setupSource = Join-Path $nekotoolRoot 'setup.ps1'
+$setupSource = Join-Path $nekotoolRoot 'scripts\setup.ps1'
 if (Test-Path -LiteralPath $setupSource) {
     Copy-Item -LiteralPath $setupSource -Destination (Join-Path $publishRoot 'setup.ps1') -Force
 }

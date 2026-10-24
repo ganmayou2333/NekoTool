@@ -47,6 +47,55 @@ $OutputEncoding = [Console]::OutputEncoding
 $scriptRoot = $PSScriptRoot
 $projectRoot = Split-Path -Parent $scriptRoot
 
+function Invoke-BackgroundUpdateCheck {
+    # Throttle the silent updater to once every 6 hours. The state file lives
+    # under data/ and is ignored by Git.
+    try {
+        $dataDir = Join-Path $projectRoot 'data'
+        if (-not (Test-Path -LiteralPath $dataDir)) {
+            New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+        }
+
+        $statePath = Join-Path $dataDir 'update_check.json'
+        $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        $lastCheck = 0
+        if (Test-Path -LiteralPath $statePath) {
+            try {
+                $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json
+                if ($state.lastCheck) { $lastCheck = [int64]$state.lastCheck }
+            }
+            catch {
+            }
+        }
+
+        if (($now - $lastCheck) -lt 21600) {
+            return
+        }
+
+        $stateJson = @{ lastCheck = $now } | ConvertTo-Json -Compress
+        [IO.File]::WriteAllText($statePath, $stateJson, (New-Object Text.UTF8Encoding($false)))
+
+        $updateScript = Join-Path $scriptRoot 'update.ps1'
+        if (-not (Test-Path -LiteralPath $updateScript)) {
+            return
+        }
+
+        # Fire-and-forget: NekoTrak must never wait for git/network work.
+        Start-Process -FilePath 'powershell.exe' `
+            -ArgumentList @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                '-WindowStyle', 'Hidden',
+                '-File', $updateScript,
+                '-Quiet', '-AutoUpdate'
+            ) `
+            -WorkingDirectory $projectRoot `
+            -WindowStyle Hidden | Out-Null
+    }
+    catch {
+        # Update failures must never break status polling.
+    }
+}
+
 # setup.ps1 writes this file. Values are optional; command-line parameters
 # and environment variables still take precedence.
 $configPath = Join-Path $projectRoot 'config.ps1'
@@ -68,6 +117,9 @@ if (Test-Path -LiteralPath $configPath) {
     }
 }
 
+# Silent daily-ish update check. It never blocks the status request.
+Invoke-BackgroundUpdateCheck
+
 $mutex = $null
 $hasLock = $false
 
@@ -84,7 +136,7 @@ function Test-StatusCastApi {
 }
 
 function Test-StatusCastProcess {
-    $process = Get-Process -Name 'StatusCast.Daemon', 'StatusCast.Gui', 'StatusCast' -ErrorAction SilentlyContinue
+    $process = Get-Process -Name 'StatusCast.Daemon' -ErrorAction SilentlyContinue
     return ($null -ne $process)
 }
 
@@ -129,8 +181,7 @@ function Find-StatusCastExe {
         return $null
     }
 
-    # Preferred: the v3.1 headless daemon. Keep the old GUI as a fallback
-    # for users upgrading from StatusCast <= v3.0.
+    # Preferred: the v3.1+ headless daemon.
     $daemonRoots = @(
         (Join-Path $root 'src\StatusCast.Daemon\bin'),
         (Join-Path $root 'dist')
@@ -147,15 +198,7 @@ function Find-StatusCastExe {
         }
     }
 
-    $guiRoot = Join-Path $root 'gui\StatusCast.Gui\bin'
-    if (-not (Test-Path -LiteralPath $guiRoot)) {
-        return $null
-    }
-
-    return Get-ChildItem -Path $guiRoot -Filter 'StatusCast.Gui.exe' -File -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch '\\AppX\\' } |
-        Sort-Object LastWriteTime -Descending |
-        Select-Object -First 1 -ExpandProperty FullName
+    return $null
 }
 
 function Start-StatusCast {
@@ -168,29 +211,6 @@ function Start-StatusCast {
         }
         catch {
             [Console]::Error.WriteLine("NekoTool: failed to start $exe : $($_.Exception.Message)")
-        }
-    }
-
-    return $false
-}
-
-function Start-StatusCastWrapper {
-    # Development fallback: run the existing GUI wrapper hidden. This is useful
-    # for a packaged WinUI build where a direct exe has no package identity.
-    $root = Find-StatusCastRoot -ExplicitRoot $StatusCastRoot
-    if ($root) {
-        $wrapper = Join-Path $root 'scripts\run_daemon.ps1'
-        if (Test-Path -LiteralPath $wrapper) {
-            try {
-                Start-Process -FilePath 'powershell.exe' `
-                    -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $wrapper) `
-                    -WindowStyle Hidden | Out-Null
-                [Console]::Error.WriteLine("NekoTool: started StatusCast via $wrapper")
-                return $true
-            }
-            catch {
-                [Console]::Error.WriteLine("NekoTool: failed to start run_daemon.ps1: $($_.Exception.Message)")
-            }
         }
     }
 
@@ -235,16 +255,6 @@ try {
                 $firstWait = [Math]::Min(3, $TimeoutSeconds)
                 $waitBudget = [Math]::Max(0, $TimeoutSeconds - $firstWait)
                 $apiReady = Wait-StatusCastApi -Url $StatusUrl -Seconds $firstWait
-
-                # Packaged WinUI exe may lack identity. If the direct exe did
-                # not come up, try the hidden dotnet wrapper for the remainder.
-                if (-not $apiReady -and -not (Test-StatusCastProcess)) {
-                    $wrapperStarted = Start-StatusCastWrapper
-                    if ($wrapperStarted -and $waitBudget -gt 0) {
-                        $apiReady = Wait-StatusCastApi -Url $StatusUrl -Seconds $waitBudget
-                        $waitBudget = 0
-                    }
-                }
             }
         }
 

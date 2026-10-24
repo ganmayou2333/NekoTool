@@ -11,5 +11,8 @@ desktop.ini
 
 config.ps1
 
+
 publish/
 StatusCast_v*_Release.zip
+data/*.json
+!data/.gitkeep
