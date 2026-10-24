@@ -94,7 +94,7 @@ NekoTool/
 
 - Windows 10 / 11
 - PowerShell 5.1 或 PowerShell 7+
-- StatusCast 已安装，或已通过 `setup.ps1` 指定 `StatusCast.Gui.exe`
+- StatusCast 已安装，或已通过 `setup.ps1` 指定 `StatusCast.Daemon.exe`
 - OBS 28+（仅使用 OBS 功能时需要）
 
 NekoTool 本身不需要 Python、.NET 或管理员权限。
@@ -106,7 +106,7 @@ NekoTool 本身不需要 Python、.NET 或管理员权限。
 3. 把剪贴板里的 `${...}` 命令粘贴到 NekoTrak 的自定义文本；
 4. 搞定。
 
-`setup.ps1` 会提示选择 `StatusCast.Gui.exe`，保存为 `config.ps1`，并生成：
+`setup.ps1` 会提示选择 `StatusCast.Daemon.exe`，保存为 `config.ps1`，并生成：
 
 ```text
 ${(powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\NekoTool\scripts\launch_and_pull.ps1")}
@@ -275,7 +275,7 @@ NekoTool 可以在 StatusCast 没打开时自动把它拉起来，再返回状�
 流程：
 
 1. 先请求 `http://localhost:5099/status/`；
-2. 如果 API 不可用，检查 `StatusCast.Gui` 进程；
+2. 如果 API 不可用，检查 `StatusCast.Daemon` 进程；
 3. 没在运行就静默 `Start-Process` 启动 exe；
 4. 最多等待 5 秒，直到 API 恢复；
 5. 调用 `ultimate_status.ps1` 输出完整长句。
@@ -289,7 +289,7 @@ NekoTool 可以在 StatusCast 没打开时自动把它拉起来，再返回状�
 
 ```powershell
 $env:STATUSCAST_ROOT = 'G:\StatusCast'
-$env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast.Gui.exe'
+$env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast.Daemon.exe'
 ```
 
 也可以直接传参：
@@ -297,7 +297,7 @@ $env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast.Gui.exe'
 ```powershell
 .\scripts\launch_and_pull.ps1 `
   -StatusCastRoot 'G:\StatusCast' `
-  -StatusCastExe 'G:\StatusCast\StatusCast.Gui.exe' `
+  -StatusCastExe 'G:\StatusCast\StatusCast.Daemon.exe' `
   -TimeoutSeconds 5
 ```
 

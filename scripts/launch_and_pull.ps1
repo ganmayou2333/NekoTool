@@ -15,7 +15,7 @@
     NekoTool, or the STATUSCAST_ROOT environment variable.
 
 .PARAMETER StatusCastExe
-    Optional explicit path to StatusCast.Gui.exe.
+    Optional explicit path to StatusCast.Daemon.exe.
 
 .PARAMETER TimeoutSeconds
     Maximum wait after launching StatusCast.
@@ -24,7 +24,7 @@
     .\scripts\launch_and_pull.ps1
 
 .EXAMPLE
-    .\scripts\launch_and_pull.ps1 -StatusCastExe 'D:\Apps\StatusCast.Gui.exe'
+    .\scripts\launch_and_pull.ps1 -StatusCastExe 'D:\Apps\StatusCast.Daemon.exe'
 #>
 [CmdletBinding()]
 param(
@@ -84,7 +84,7 @@ function Test-StatusCastApi {
 }
 
 function Test-StatusCastProcess {
-    $process = Get-Process -Name 'StatusCast.Gui', 'StatusCast' -ErrorAction SilentlyContinue
+    $process = Get-Process -Name 'StatusCast.Daemon', 'StatusCast.Gui', 'StatusCast' -ErrorAction SilentlyContinue
     return ($null -ne $process)
 }
 
@@ -123,12 +123,30 @@ function Find-StatusCastExe {
         return $null
     }
 
-    $binRoot = Join-Path $root 'gui\StatusCast.Gui\bin'
-    if (-not (Test-Path -LiteralPath $binRoot)) {
+    # Preferred: the v3.1 headless daemon. Keep the old GUI as a fallback
+    # for users upgrading from StatusCast <= v3.0.
+    $daemonRoots = @(
+        (Join-Path $root 'src\StatusCast.Daemon\bin'),
+        (Join-Path $root 'dist')
+    )
+    foreach ($searchRoot in $daemonRoots) {
+        if (-not (Test-Path -LiteralPath $searchRoot)) {
+            continue
+        }
+        $daemon = Get-ChildItem -Path $searchRoot -Filter 'StatusCast.Daemon.exe' -File -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+        if ($daemon) {
+            return $daemon
+        }
+    }
+
+    $guiRoot = Join-Path $root 'gui\StatusCast.Gui\bin'
+    if (-not (Test-Path -LiteralPath $guiRoot)) {
         return $null
     }
 
-    return Get-ChildItem -Path $binRoot -Filter 'StatusCast.Gui.exe' -File -Recurse -ErrorAction SilentlyContinue |
+    return Get-ChildItem -Path $guiRoot -Filter 'StatusCast.Gui.exe' -File -Recurse -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -notmatch '\\AppX\\' } |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1 -ExpandProperty FullName
@@ -155,7 +173,7 @@ function Start-StatusCastWrapper {
     # for a packaged WinUI build where a direct exe has no package identity.
     $root = Find-StatusCastRoot -ExplicitRoot $StatusCastRoot
     if ($root) {
-        $wrapper = Join-Path $root 'scripts\run_gui.ps1'
+        $wrapper = Join-Path $root 'scripts\run_daemon.ps1'
         if (Test-Path -LiteralPath $wrapper) {
             try {
                 Start-Process -FilePath 'powershell.exe' `
@@ -165,7 +183,7 @@ function Start-StatusCastWrapper {
                 return $true
             }
             catch {
-                [Console]::Error.WriteLine("NekoTool: failed to start run_gui.ps1: $($_.Exception.Message)")
+                [Console]::Error.WriteLine("NekoTool: failed to start run_daemon.ps1: $($_.Exception.Message)")
             }
         }
     }

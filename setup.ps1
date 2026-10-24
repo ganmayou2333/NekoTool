@@ -3,7 +3,7 @@
     Interactive first-run setup for NekoTool.
 
 .DESCRIPTION
-    Asks for the compiled StatusCast.Gui.exe path, writes config.ps1, copies
+    Asks for the compiled StatusCast.Daemon.exe path, writes config.ps1, copies
     the NekoTrak command to the clipboard and optionally creates a Startup
     shortcut for StatusCast.
 
@@ -42,12 +42,20 @@ function Find-DefaultExe {
     }
 
     $root = Join-Path (Split-Path -Parent $projectRoot) 'StatusCast'
-    $binRoot = Join-Path $root 'gui\StatusCast.Gui\bin'
-    if (Test-Path -LiteralPath $binRoot) {
-        return Get-ChildItem -Path $binRoot -Filter 'StatusCast.Gui.exe' -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -notmatch '\\AppX\\' } |
+    $searchRoots = @(
+        (Join-Path $root 'src\StatusCast.Daemon\bin'),
+        (Join-Path $root 'dist')
+    )
+    foreach ($searchRoot in $searchRoots) {
+        if (-not (Test-Path -LiteralPath $searchRoot)) {
+            continue
+        }
+        $daemon = Get-ChildItem -Path $searchRoot -Filter 'StatusCast.Daemon.exe' -File -Recurse -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1 -ExpandProperty FullName
+        if ($daemon) {
+            return $daemon
+        }
     }
 
     return $null
@@ -103,6 +111,10 @@ if (Test-Path -LiteralPath $configPath) {
             $StatusCastExe = $NekoToolStatusCastExe
         }
         Write-Host "  发现已有配置：$configPath" -ForegroundColor DarkGray
+        if ($StatusCastExe -and -not (Test-Path -LiteralPath $StatusCastExe -PathType Leaf)) {
+            Write-Host '  旧配置中的 exe 已不存在，重新自动检测。' -ForegroundColor Yellow
+            $StatusCastExe = ''
+        }
     }
     catch {
         Write-Host '  已有 config.ps1 无法读取，将重新生成。' -ForegroundColor Yellow
@@ -114,7 +126,7 @@ if ([string]::IsNullOrWhiteSpace($StatusCastExe)) {
     if ($defaultExe) {
         Write-Host "  自动检测到：$defaultExe" -ForegroundColor DarkGray
         Write-Host ''
-        $inputPath = Read-Host "  StatusCast.Gui.exe 路径（回车使用自动检测）"
+        $inputPath = Read-Host "  StatusCast.Daemon.exe 路径（回车使用自动检测）"
         if ([string]::IsNullOrWhiteSpace($inputPath)) {
             $StatusCastExe = $defaultExe
         }
@@ -123,14 +135,16 @@ if ([string]::IsNullOrWhiteSpace($StatusCastExe)) {
         }
     }
     else {
-        Write-Host '  没有自动找到 StatusCast.Gui.exe。' -ForegroundColor Yellow
-        $StatusCastExe = (Read-Host '  请输入 StatusCast.Gui.exe 的绝对路径').Trim('"').Trim()
+        Write-Host '  没有自动找到 StatusCast.Daemon.exe。' -ForegroundColor Yellow
+        $StatusCastExe = (Read-Host '  请输入 StatusCast.Daemon.exe 的绝对路径').Trim('"').Trim()
     }
 }
 
-while (-not (Test-Path -LiteralPath $StatusCastExe -PathType Leaf)) {
-    Write-Host "  路径不存在：$StatusCastExe" -ForegroundColor Red
-    $StatusCastExe = (Read-Host '  请重新输入 StatusCast.Gui.exe 的绝对路径').Trim('"').Trim()
+while ([string]::IsNullOrWhiteSpace($StatusCastExe) -or -not (Test-Path -LiteralPath $StatusCastExe -PathType Leaf)) {
+    if (-not [string]::IsNullOrWhiteSpace($StatusCastExe)) {
+        Write-Host "  路径不存在：$StatusCastExe" -ForegroundColor Red
+    }
+    $StatusCastExe = (Read-Host '  请重新输入 StatusCast.Daemon.exe 的绝对路径').Trim('"').Trim()
 }
 
 $StatusCastExe = (Resolve-Path -LiteralPath $StatusCastExe).Path
