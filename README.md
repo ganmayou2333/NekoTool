@@ -78,6 +78,7 @@ NekoTool/
 │  ├─ pull_status.ps1             # 基础版：只读手机状态
 │  ├─ ultimate_status.ps1         # 终极版：手机 + 系统 + 插件
 │  ├─ write_to_obs.ps1            # OBS 专用：循环写入本地 txt
+│  ├─ launch_and_pull.ps1         # 看门狗：自动启动 StatusCast 后取数
 │  ├─ mock_data.json              # StatusCast 模拟数据
 │  └─ generate_preview.ps1        # 无头浏览器生成预览图
 ├─ plugins/
@@ -256,6 +257,49 @@ Write-Output "🌤 $response"
 ```
 
 如果天气服务失败，脚本会报错；NekoTool 会跳过它并继续输出手机和系统状态。
+
+## 随叫随到：自动启动 StatusCast
+
+NekoTool 可以在 StatusCast 没打开时自动把它拉起来，再返回状态。
+
+```powershell
+.\scripts\launch_and_pull.ps1
+```
+
+流程：
+
+1. 先请求 `http://localhost:5099/status/`；
+2. 如果 API 不可用，检查 `StatusCast.Gui` 进程；
+3. 没在运行就静默 `Start-Process` 启动 exe；
+4. 最多等待 5 秒，直到 API 恢复；
+5. 调用 `ultimate_status.ps1` 输出完整长句。
+
+防重复：
+
+- 使用命名 Mutex，避免 NekoTrak 连续刷新时重复启动；
+- 已有进程或 API 已就绪时不会再次启动。
+
+可配置路径：
+
+```powershell
+$env:STATUSCAST_ROOT = 'G:\StatusCast'
+$env:STATUSCAST_EXE  = 'G:\StatusCast\StatusCast.Gui.exe'
+```
+
+也可以直接传参：
+
+```powershell
+.\scripts\launch_and_pull.ps1 `
+  -StatusCastRoot 'G:\StatusCast' `
+  -StatusCastExe 'G:\StatusCast\StatusCast.Gui.exe' `
+  -TimeoutSeconds 5
+```
+
+NekoTrak 中使用：
+
+```text
+{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\NekoTool\scripts\launch_and_pull.ps1"}
+```
 
 ## NekoTrak 接入
 
