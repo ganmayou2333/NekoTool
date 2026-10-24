@@ -46,6 +46,28 @@ $OutputEncoding = [Console]::OutputEncoding
 
 $scriptRoot = $PSScriptRoot
 $projectRoot = Split-Path -Parent $scriptRoot
+
+# setup.ps1 writes this file. Values are optional; command-line parameters
+# and environment variables still take precedence.
+$configPath = Join-Path $projectRoot 'config.ps1'
+if (Test-Path -LiteralPath $configPath) {
+    try {
+        . $configPath
+        if ([string]::IsNullOrWhiteSpace($StatusCastExe) -and $NekoToolStatusCastExe) {
+            $StatusCastExe = $NekoToolStatusCastExe
+        }
+        if ([string]::IsNullOrWhiteSpace($StatusCastRoot) -and $NekoToolStatusCastRoot) {
+            $StatusCastRoot = $NekoToolStatusCastRoot
+        }
+        if ($StatusUrl -eq 'http://localhost:5099/status/' -and $NekoToolStatusUrl) {
+            $StatusUrl = $NekoToolStatusUrl
+        }
+    }
+    catch {
+        [Console]::Error.WriteLine("NekoTool: config.ps1 could not be loaded: $($_.Exception.Message)")
+    }
+}
+
 $mutex = $null
 $hasLock = $false
 

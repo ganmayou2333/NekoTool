@@ -73,6 +73,8 @@ NekoTool/
 ├─ README.md
 ├─ LICENSE
 ├─ .gitignore
+├─ setup.ps1                      # 一键交互式配置
+├─ config.ps1                     # setup.ps1 生成，不提交
 ├─ obs_status.txt                 # write_to_obs.ps1 运行时生成，不提交
 ├─ scripts/
 │  ├─ pull_status.ps1             # 基础版：只读手机状态
@@ -92,23 +94,27 @@ NekoTool/
 
 - Windows 10 / 11
 - PowerShell 5.1 或 PowerShell 7+
-- [StatusCast](https://github.com/ganmayou2333/StatusCast) 正在运行
+- StatusCast 已安装，或已通过 `setup.ps1` 指定 `StatusCast.Gui.exe`
 - OBS 28+（仅使用 OBS 功能时需要）
 
 NekoTool 本身不需要 Python、.NET 或管理员权限。
 
 ## 快速开始
 
-```powershell
-git clone https://github.com/ganmayou2333/NekoTool.git
-cd NekoTool
+1. 下载 NekoTool 源码；
+2. 右键运行根目录的 `setup.ps1`（或执行 `powershell -ExecutionPolicy Bypass -File .\setup.ps1`）；
+3. 把剪贴板里的 `${...}` 命令粘贴到 NekoTrak 的自定义文本；
+4. 搞定。
+
+`setup.ps1` 会提示选择 `StatusCast.Gui.exe`，保存为 `config.ps1`，并生成：
+
+```text
+${(powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\NekoTool\scripts\launch_and_pull.ps1")}
 ```
 
-先确认 StatusCast API 正常：
+之后 NekoTrak 每次刷新都会自动检测并启动 StatusCast，不需要手动打开。
 
-```powershell
-Invoke-RestMethod -Uri 'http://localhost:5099/status/' -UseBasicParsing
-```
+> 想手动运行或调试，继续看下面的分步说明。
 
 ### 1. 基础版：只读手机状态
 
@@ -279,7 +285,7 @@ NekoTool 可以在 StatusCast 没打开时自动把它拉起来，再返回状�
 - 使用命名 Mutex，避免 NekoTrak 连续刷新时重复启动；
 - 已有进程或 API 已就绪时不会再次启动。
 
-可配置路径：
+`launch_and_pull.ps1` 会优先读取 `setup.ps1` 生成的 `config.ps1`。也可以手动覆盖路径：
 
 ```powershell
 $env:STATUSCAST_ROOT = 'G:\StatusCast'
