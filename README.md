@@ -7,6 +7,36 @@ NekoTool 不负责 USB 采集。它只做一件事：把 **StatusCast** 已经�
 > 底层采集由 [StatusCast](https://github.com/ganmayou2333/StatusCast) 负责。  
 > NekoTool 是它旁边的轻量级客户端层。
 
+![NekoTool preview](web/preview-mock.png)
+
+## 无需安装，直接看效果
+
+即使没有连接手机、甚至没有启动 StatusCast，也可以先用内置模拟数据预览效果：
+
+```powershell
+.\scripts\ultimate_status.ps1 -MockMode
+```
+
+输出示例：
+
+```text
+📱 主力机 | 🔋 87% ⚡ | 🎵 Yesterday - The Beatles | 🖥 33% | 🧠 63% | 🌐 ↓1.2M ↑86K | 🕐 21:41
+```
+
+如果想让 CPU / 内存 / 网速也使用固定演示值，加上 `-MockHardware`：
+
+```powershell
+.\scripts\ultimate_status.ps1 -MockMode -MockHardware
+```
+
+重新生成 README 里的预览图：
+
+```powershell
+.\scripts\generate_preview.ps1
+```
+
+脚本会自动调用 Edge / Chrome 无头模式，把 `web/preview-mock.png` 生成出来。
+
 ## 为什么单独做一个仓库？
 
 StatusCast 的职责是“稳定采集 + 提供本地 API”：
@@ -38,9 +68,13 @@ NekoTool/
 ├─ scripts/
 │  ├─ pull_status.ps1             # 基础版：只读手机状态
 │  ├─ ultimate_status.ps1         # 终极版：缝合手机 + CPU + 内存 + 网速 + 时间
-│  └─ write_to_obs.ps1            # OBS 专用：循环写入本地 txt
+│  ├─ write_to_obs.ps1            # OBS 专用：循环写入本地 txt
+│  ├─ mock_data.json              # StatusCast v2 模拟数据
+│  └─ generate_preview.ps1        # 无头浏览器生成预览图
 └─ web/
-   └─ widget.html                 # OBS 浏览器源挂件
+   ├─ widget.html                 # OBS 浏览器源挂件
+   ├─ preview-mock.png            # README 预览图
+   └─ widget-preview.png          # 旧版挂件截图
 ```
 
 ## 环境要求
@@ -151,7 +185,7 @@ G:\NekoTool\web\widget.html
 
 背景设为透明，即可得到一个跟随 StatusCast 实时更新的电量圆弧挂件。
 
-![NekoTool OBS widget](web/widget-preview.png)
+![NekoTool OBS widget](web/preview-mock.png)
 
 如果 API 不在默认地址，可以在 URL 后面覆盖：
 
@@ -204,6 +238,14 @@ ${(Invoke-RestMethod -Uri 'http://localhost:5099/status/' -UseBasicParsing).text
 | --- | --- | --- |
 | `-StatusUrl` | `http://localhost:5099/status/` | StatusCast API 地址 |
 | `-SampleSeconds` | `1.0` | 网速采样时长，范围 0.2–5 秒 |
+| `-MockMode` | 关闭 | 从 `scripts/mock_data.json` 读取手机状态，不请求 API |
+| `-MockHardware` | 关闭 | CPU / 内存 / 网速使用固定演示值 |
+
+### generate_preview.ps1
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `-BrowserPath` | 自动查找 Edge / Chrome | 指定无头浏览器路径 |
 
 ### write_to_obs.ps1
 

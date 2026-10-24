@@ -252,7 +252,7 @@
         const mediaData = data && data.media ? data.media : {};
         const value = Number.isFinite(battery.level) ? Math.max(0, Math.min(100, battery.level)) : null;
         const text = data && data.text ? data.text : offlineText;
-        const modelText = text.split("|")[0].replace(/^📱\s*/, "").trim() || "未知机型";
+        const modelText = text.split("|")[0].replace(/^📱\s*/, "").replace(/^🤖\s*/, "").trim() || "未知机型";
 
         level.textContent = value === null ? "--" : value;
         ring.style.setProperty("--level", value === null ? 0 : value);
@@ -319,6 +319,12 @@
         } finally {
           clearTimeout(timer);
         }
+      }
+
+      if (window.__NEKOTOOL_MOCK__) {
+        render(window.__NEKOTOOL_MOCK__);
+        setInterval(() => render(window.__NEKOTOOL_MOCK__), 1000);
+        return;
       }
 
       tick();

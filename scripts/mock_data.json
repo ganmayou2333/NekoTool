@@ -1,0 +1,65 @@
+{
+  "schema": 2,
+  "generatedAt": 1792848052,
+  "primaryDeviceId": "iphone",
+  "devices": [
+    {
+      "id": "iphone",
+      "platform": "ios",
+      "model": "iPhone15,3",
+      "displayName": "主力机",
+      "batteryLevel": 87,
+      "isCharging": true,
+      "mediaTitle": "Yesterday",
+      "mediaArtist": "The Beatles",
+      "mediaState": "playing",
+      "foregroundApp": null,
+      "foregroundAppName": null,
+      "updatedAt": 1792848052,
+      "error": null,
+      "text": "📱 主力机 | 🔋 87% ⚡ | 🎵 Yesterday - The Beatles"
+    },
+    {
+      "id": "android",
+      "platform": "android",
+      "model": "Pixel 7",
+      "displayName": "备用机",
+      "batteryLevel": 42,
+      "isCharging": false,
+      "mediaTitle": "晴天",
+      "mediaArtist": "周杰伦",
+      "mediaState": "playing",
+      "foregroundApp": "com.tencent.mm",
+      "foregroundAppName": "微信",
+      "updatedAt": 1792848052,
+      "error": null,
+      "text": "🤖 备用机 | 🔋 42% | 🎵 晴天 - 周杰伦"
+    }
+  ],
+  "plugins": [
+    {
+      "name": "Clock",
+      "status": "🕐 21:23:47",
+      "error": null
+    }
+  ],
+  "battery": {
+    "level": 87,
+    "isCharging": true,
+    "updatedAt": 1792848052,
+    "error": null
+  },
+  "media": {
+    "title": "Yesterday",
+    "artist": "The Beatles",
+    "album": null,
+    "playbackState": "playing",
+    "durationSeconds": null,
+    "elapsedSeconds": null,
+    "playerName": null,
+    "updatedAt": 1792848052,
+    "error": null
+  },
+  "errors": [],
+  "text": "📱 主力机 | 🔋 87% ⚡ | 🎵 Yesterday - The Beatles"
+}

@@ -12,12 +12,20 @@
 
 .EXAMPLE
     .\scripts\ultimate_status.ps1 -SampleSeconds 0.5
+
+.EXAMPLE
+    .\scripts\ultimate_status.ps1 -MockMode
+
+.EXAMPLE
+    .\scripts\ultimate_status.ps1 -MockMode -MockHardware
 #>
 [CmdletBinding()]
 param(
     [string]$StatusUrl = 'http://localhost:5099/status/',
     [ValidateRange(0.2, 5.0)]
-    [double]$SampleSeconds = 1.0
+    [double]$SampleSeconds = 1.0,
+    [switch]$MockMode,
+    [switch]$MockHardware
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -25,6 +33,33 @@ $ErrorActionPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 $OutputEncoding = [Console]::OutputEncoding
 
+
+function Get-MockPhoneText {
+    $mockPath = Join-Path $PSScriptRoot 'mock_data.json'
+    if (-not (Test-Path -LiteralPath $mockPath)) {
+        return '📱 -- | 🔋 -- | 🎵 --'
+    }
+
+    try {
+        $mock = Get-Content -LiteralPath $mockPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $devices = @($mock.devices)
+        $primary = $devices |
+            Where-Object { $_.id -eq $mock.primaryDeviceId } |
+            Select-Object -First 1
+
+        if ($null -eq $primary) {
+            $primary = $devices | Select-Object -First 1
+        }
+
+        if ($null -ne $primary -and $primary.text) {
+            return [string]$primary.text
+        }
+    }
+    catch {
+    }
+
+    return '📱 -- | 🔋 -- | 🎵 --'
+}
 
 function Get-PhoneText {
     try {
@@ -106,19 +141,28 @@ function Format-Percent {
     return "$Value%"
 }
 
-$phone = Get-PhoneText
-$cpu = Get-CpuPercent
-$memory = Get-MemoryPercent
-
-$before = Get-NetworkCounters
-Start-Sleep -Milliseconds ([int]($SampleSeconds * 1000))
-$after = Get-NetworkCounters
+$phone = if ($MockMode) { Get-MockPhoneText } else { Get-PhoneText }
 
 $rxRate = $null
 $txRate = $null
-if ($null -ne $before -and $null -ne $after) {
-    $rxRate = [Math]::Max(0, ($after[0] - $before[0]) / $SampleSeconds)
-    $txRate = [Math]::Max(0, ($after[1] - $before[1]) / $SampleSeconds)
+if ($MockHardware) {
+    $cpu = 33
+    $memory = 63
+    $rxRate = 1.2MB
+    $txRate = 86KB
+}
+else {
+    $cpu = Get-CpuPercent
+    $memory = Get-MemoryPercent
+
+    $before = Get-NetworkCounters
+    Start-Sleep -Milliseconds ([int]($SampleSeconds * 1000))
+    $after = Get-NetworkCounters
+
+    if ($null -ne $before -and $null -ne $after) {
+        $rxRate = [Math]::Max(0, ($after[0] - $before[0]) / $SampleSeconds)
+        $txRate = [Math]::Max(0, ($after[1] - $before[1]) / $SampleSeconds)
+    }
 }
 
 $network = if ($null -eq $rxRate) {
