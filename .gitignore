@@ -1,0 +1,8 @@
+obs_status.txt
+*.log
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+.edge-profile*/
