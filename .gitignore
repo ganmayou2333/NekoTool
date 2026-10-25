@@ -16,3 +16,15 @@ publish/
 StatusCast_v*_Release.zip
 data/*.json
 !data/.gitkeep
+
+# Web dashboard runtime files
+plugins/*.bak
+__pycache__/
+*.pyc
+
+# NekoTool.App build outputs
+NekoTool.App/bin/
+NekoTool.App/obj/
+dist/
+NekoTool.App.exe
+*.WebView2/

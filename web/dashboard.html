@@ -1,0 +1,1335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>NekoTool · Control Center</title>
+  <style>
+    :root {
+      --bg: #070b16;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --dim: #64748b;
+      --cyan: #22d3ee;
+      --green: #34d399;
+      --gold: #f6c453;
+      --red: #fb7185;
+      --purple: #a78bfa;
+      --line: rgba(255, 255, 255, 0.1);
+      --line-strong: rgba(255, 255, 255, 0.16);
+      --glass: rgba(13, 20, 36, 0.72);
+      --glass-soft: rgba(20, 30, 51, 0.55);
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+      --radius: 20px;
+      --mono: "Cascadia Code", "Cascadia Mono", Consolas, "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(34, 211, 238, 0.13), transparent 36%),
+        radial-gradient(circle at 92% 10%, rgba(167, 139, 250, 0.12), transparent 38%),
+        radial-gradient(circle at 50% 100%, rgba(52, 211, 153, 0.07), transparent 45%),
+        var(--bg);
+      font-family: "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, black, transparent 85%);
+    }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.34);
+    }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
+
+    button, input, textarea { font: inherit; }
+
+    button {
+      border: 1px solid var(--line-strong);
+      border-radius: 11px;
+      padding: 8px 13px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.06);
+      cursor: pointer;
+      transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: rgba(34, 211, 238, 0.55);
+      background: rgba(34, 211, 238, 0.1);
+    }
+
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    button.primary {
+      border-color: rgba(34, 211, 238, 0.45);
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.22), rgba(167, 139, 250, 0.2));
+    }
+
+    .hidden { display: none !important; }
+    .muted { color: var(--muted); }
+    .mono { font-family: var(--mono); }
+
+    .glass {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(145deg, rgba(21, 32, 54, 0.72), rgba(10, 16, 29, 0.6));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      width: min(1560px, 100%);
+      margin: 0 auto;
+      padding: 22px 24px 30px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 13px;
+      font-size: 20px;
+      background: linear-gradient(135deg, rgba(34, 211, 238, 0.24), rgba(167, 139, 250, 0.22));
+      border: 1px solid rgba(34, 211, 238, 0.32);
+      box-shadow: 0 0 24px rgba(34, 211, 238, 0.16);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: 0.02em;
+    }
+
+    .brand h1 span { color: var(--cyan); }
+
+    .brand p {
+      margin: 3px 0 0;
+      color: var(--dim);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.035);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .pill .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--dim);
+    }
+
+    .pill.online { color: var(--green); border-color: rgba(52, 211, 153, 0.25); }
+    .pill.online .dot { background: var(--green); box-shadow: 0 0 12px rgba(52, 211, 153, 0.8); animation: pulse 2s infinite; }
+    .pill.offline { color: var(--red); border-color: rgba(251, 113, 133, 0.25); }
+    .pill.offline .dot { background: var(--red); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    .banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding: 12px 15px;
+      border: 1px solid rgba(251, 113, 133, 0.26);
+      border-radius: 14px;
+      color: #fecdd3;
+      background: rgba(251, 113, 133, 0.08);
+      font-size: 13px;
+    }
+
+    .section-head,
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .section-head {
+      margin: 2px 2px 10px;
+    }
+
+    .section-head h2,
+    .panel-head h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .section-head h2 { color: #e2e8f0; }
+
+    .hint {
+      color: var(--dim);
+      font-size: 11px;
+    }
+
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 13px;
+      margin-bottom: 16px;
+    }
+
+    .device-card {
+      position: relative;
+      overflow: hidden;
+      min-height: 190px;
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgba(20, 32, 54, 0.8), rgba(9, 15, 28, 0.7));
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24);
+    }
+
+    .device-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -30px -70px auto;
+      width: 170px;
+      height: 170px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(34, 211, 238, 0.12), transparent 68%);
+      pointer-events: none;
+    }
+
+    .device-card.is-offline { border-color: rgba(251, 113, 133, 0.18); }
+    .device-card.is-offline::after { background: radial-gradient(circle, rgba(251, 113, 133, 0.08), transparent 68%); }
+
+    .device-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .device-platform {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .device-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--dim);
+      font-size: 11px;
+    }
+
+    .device-state .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--dim);
+    }
+
+    .device-state.online { color: var(--green); }
+    .device-state.online .dot { background: var(--green); box-shadow: 0 0 12px rgba(52, 211, 153, 0.8); }
+
+    .device-body {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .battery-ring {
+      position: relative;
+      display: grid;
+      place-items: center;
+      flex: 0 0 82px;
+      width: 82px;
+      height: 82px;
+      border-radius: 50%;
+      background: conic-gradient(
+        var(--ring, var(--cyan)) calc(var(--level, 0) * 1%),
+        rgba(255, 255, 255, 0.075) 0
+      );
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .battery-ring::before {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      background: #0b1220;
+      box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.55);
+    }
+
+    .battery-ring span {
+      position: relative;
+      z-index: 1;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .battery-ring.unknown {
+      background: conic-gradient(rgba(148, 163, 184, 0.24) 0 100%);
+    }
+
+    .device-main { min-width: 0; flex: 1; }
+
+    .device-name {
+      overflow: hidden;
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .device-model {
+      margin: 3px 0 9px;
+      overflow: hidden;
+      color: var(--dim);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .device-charge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .device-charge.charging { color: var(--gold); border-color: rgba(246, 196, 83, 0.24); }
+
+    .device-details {
+      display: grid;
+      gap: 6px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .device-details div {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .device-details span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .device-error {
+      margin-top: 11px;
+      padding: 8px 10px;
+      border: 1px solid rgba(251, 113, 133, 0.2);
+      border-radius: 10px;
+      color: #fda4af;
+      background: rgba(251, 113, 133, 0.06);
+      font-size: 11px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr) 390px;
+      gap: 13px;
+      align-items: stretch;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 520px;
+      overflow: hidden;
+    }
+
+    .panel-head {
+      flex: 0 0 auto;
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-head h2 { color: #e2e8f0; }
+
+    .panel-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-actions button,
+    .panel-head button {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+
+    .plugin-summary {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      padding: 12px 14px 8px;
+      color: var(--dim);
+      font-size: 11px;
+    }
+
+    .count-badge {
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .count-badge strong { color: var(--text); }
+    .count-badge.on strong { color: var(--green); }
+    .count-badge.off strong { color: var(--dim); }
+
+    .plugin-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 4px 10px 12px;
+    }
+
+    .plugin-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 9px 10px 11px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease;
+    }
+
+    .plugin-row:hover {
+      border-color: var(--line);
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .plugin-row.selected {
+      border-color: rgba(34, 211, 238, 0.34);
+      background: linear-gradient(90deg, rgba(34, 211, 238, 0.12), rgba(34, 211, 238, 0.03));
+    }
+
+    .plugin-row.disabled .plugin-name { color: var(--dim); }
+
+    .plugin-info { min-width: 0; }
+
+    .plugin-name {
+      display: block;
+      overflow: hidden;
+      max-width: 190px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .plugin-meta {
+      display: block;
+      margin-top: 4px;
+      color: var(--dim);
+      font-size: 10px;
+    }
+
+    .plugin-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .status-chip {
+      padding: 3px 7px;
+      border: 1px solid rgba(52, 211, 153, 0.22);
+      border-radius: 999px;
+      color: var(--green);
+      background: rgba(52, 211, 153, 0.07);
+      font-size: 9px;
+      letter-spacing: 0.04em;
+    }
+
+    .status-chip.off {
+      border-color: var(--line);
+      color: var(--dim);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 21px;
+      flex: 0 0 auto;
+    }
+
+    .switch input {
+      width: 0;
+      height: 0;
+      opacity: 0;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      cursor: pointer;
+      background: rgba(100, 116, 139, 0.28);
+      transition: background 0.18s ease, border-color 0.18s ease;
+    }
+
+    .slider::before {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+
+    .switch input:checked + .slider {
+      border-color: rgba(52, 211, 153, 0.5);
+      background: rgba(52, 211, 153, 0.28);
+    }
+
+    .switch input:checked + .slider::before {
+      transform: translateX(15px);
+      background: #d1fae5;
+    }
+
+    .empty {
+      display: grid;
+      place-items: center;
+      min-height: 130px;
+      padding: 18px;
+      color: var(--dim);
+      font-size: 12px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .editor-panel { min-height: 520px; }
+
+    .editor-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .editor-title-wrap h2 {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .editor-path {
+      overflow: hidden;
+      color: var(--dim);
+      font-family: var(--mono);
+      font-size: 10px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dirty-badge {
+      padding: 3px 7px;
+      border: 1px solid rgba(246, 196, 83, 0.25);
+      border-radius: 999px;
+      color: var(--gold);
+      font-size: 10px;
+    }
+
+    .editor-wrap {
+      position: relative;
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      padding: 12px;
+    }
+
+    #editor {
+      width: 100%;
+      min-height: 390px;
+      height: 100%;
+      resize: vertical;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      outline: none;
+      color: #dbeafe;
+      background: rgba(3, 7, 18, 0.72);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.65;
+      tab-size: 4;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    #editor:focus {
+      border-color: rgba(34, 211, 238, 0.46);
+      box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.07);
+    }
+
+    #editor:disabled { opacity: 0.44; }
+
+    .editor-foot,
+    .preview-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex: 0 0 auto;
+      padding: 10px 15px 13px;
+      color: var(--dim);
+      font-size: 10px;
+    }
+
+    .preview-panel { min-height: 520px; }
+
+    .auto-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      user-select: none;
+    }
+
+    .auto-toggle input { accent-color: var(--cyan); }
+
+    .preview-box {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      padding: 12px;
+    }
+
+    #preview-output {
+      width: 100%;
+      min-height: 220px;
+      max-height: 360px;
+      margin: 0;
+      overflow: auto;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      color: #a5f3fc;
+      background: rgba(3, 7, 18, 0.72);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    #preview-output.error {
+      color: #fda4af;
+      border-color: rgba(251, 113, 133, 0.25);
+      background: rgba(251, 113, 133, 0.06);
+    }
+
+    .preview-meta {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .preview-meta.ok { color: var(--green); }
+    .preview-meta.bad { color: var(--red); }
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 0 3px;
+      color: var(--dim);
+      font-size: 10px;
+    }
+
+    .footer code {
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    .toasts {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: min(360px, calc(100vw - 40px));
+    }
+
+    .toast {
+      padding: 11px 14px;
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      color: var(--text);
+      background: rgba(15, 23, 42, 0.94);
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      line-height: 1.45;
+      animation: toast-in 0.2s ease both;
+    }
+
+    .toast.ok { border-color: rgba(52, 211, 153, 0.35); }
+    .toast.bad { border-color: rgba(251, 113, 133, 0.4); }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1220px) {
+      .workspace { grid-template-columns: 290px minmax(0, 1fr); }
+      .preview-panel { grid-column: 1 / -1; min-height: 300px; }
+      .preview-box { min-height: 160px; }
+      #preview-output { max-height: 240px; }
+    }
+
+    @media (max-width: 820px) {
+      .shell { padding: 14px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .top-actions { justify-content: flex-start; }
+      .workspace { grid-template-columns: 1fr; }
+      .preview-panel { grid-column: auto; }
+      .panel, .editor-panel, .preview-panel { min-height: auto; }
+      .plugin-list { max-height: 290px; }
+      .device-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar glass">
+      <div class="brand">
+        <div class="brand-mark">🐾</div>
+        <div>
+          <h1>Neko<span>Tool</span> · Control Center</h1>
+          <p>DEVICE MONITOR / PLUGINS / LIVE PREVIEW</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div id="api-pill" class="pill">
+          <span class="dot"></span>
+          <span id="api-text">连接中…</span>
+        </div>
+        <button id="btn-refresh-all" type="button">刷新全部</button>
+      </div>
+    </header>
+
+    <div id="offline-banner" class="banner hidden">
+      <span>⚠️</span>
+      <span id="offline-text">StatusCast API 暂时不可用。</span>
+    </div>
+
+    <section aria-labelledby="devices-title">
+      <div class="section-head">
+        <h2 id="devices-title">设备监控</h2>
+        <span id="devices-updated" class="hint">等待数据…</span>
+      </div>
+      <div id="device-grid" class="device-grid">
+        <div class="empty">正在连接 StatusCast…</div>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section class="panel glass" aria-labelledby="plugins-title">
+        <div class="panel-head">
+          <h2 id="plugins-title">插件管理</h2>
+          <div class="panel-actions">
+            <button id="btn-refresh-plugins" type="button">刷新</button>
+          </div>
+        </div>
+        <div class="plugin-summary">
+          <span class="count-badge on">启用 <strong id="count-enabled">0</strong></span>
+          <span class="count-badge off">禁用 <strong id="count-disabled">0</strong></span>
+          <span class="count-badge">共 <strong id="count-total">0</strong></span>
+        </div>
+        <div id="plugin-list" class="plugin-list">
+          <div class="empty">正在读取 plugins/…</div>
+        </div>
+      </section>
+
+      <section class="panel glass editor-panel" aria-labelledby="editor-title">
+        <div class="panel-head">
+          <div class="editor-title-wrap">
+            <h2 id="editor-title">插件编辑器</h2>
+            <span id="editor-path" class="editor-path"></span>
+          </div>
+          <div class="panel-actions">
+            <span id="dirty-badge" class="dirty-badge hidden">未保存</span>
+            <button id="btn-save" class="primary" type="button" disabled>保存</button>
+          </div>
+        </div>
+        <div class="editor-wrap">
+          <div id="editor-hint" class="empty" style="position:absolute;inset:12px;pointer-events:none;">
+            从左侧选择一个插件开始编辑。
+          </div>
+          <textarea id="editor" spellcheck="false" disabled placeholder="选择插件后在这里编辑…"></textarea>
+        </div>
+        <div class="editor-foot">
+          <span id="editor-meta">未选择文件</span>
+          <span>Ctrl+S 保存 · 保存前自动备份 .bak</span>
+        </div>
+      </section>
+
+      <section class="panel glass preview-panel" aria-labelledby="preview-title">
+        <div class="panel-head">
+          <h2 id="preview-title">状态预览</h2>
+          <div class="panel-actions">
+            <label class="auto-toggle">
+              <input id="auto-preview" type="checkbox" checked>
+              自动
+            </label>
+            <button id="btn-refresh-preview" type="button">刷新</button>
+          </div>
+        </div>
+        <div class="preview-box">
+          <pre id="preview-output">点击「刷新」生成 ultimate_status.ps1 的输出。</pre>
+        </div>
+        <div class="preview-foot">
+          <span id="preview-meta" class="preview-meta">尚未运行</span>
+          <button id="btn-copy-preview" type="button">复制</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>本地控制台 · <code>127.0.0.1:5100</code> · 仅监听本机回环</span>
+      <span>StatusCast API：<code>localhost:5099/status/</code></span>
+    </footer>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const state = {
+        plugins: [],
+        selected: null,
+        dirty: false,
+        statusBusy: false,
+        previewBusy: false,
+      };
+
+      const $ = (id) => document.getElementById(id);
+
+      const el = {
+        apiPill: $("api-pill"),
+        apiText: $("api-text"),
+        offlineBanner: $("offline-banner"),
+        offlineText: $("offline-text"),
+        deviceGrid: $("device-grid"),
+        devicesUpdated: $("devices-updated"),
+        pluginList: $("plugin-list"),
+        countEnabled: $("count-enabled"),
+        countDisabled: $("count-disabled"),
+        countTotal: $("count-total"),
+        editorTitle: $("editor-title"),
+        editorPath: $("editor-path"),
+        dirtyBadge: $("dirty-badge"),
+        saveButton: $("btn-save"),
+        editorHint: $("editor-hint"),
+        editor: $("editor"),
+        editorMeta: $("editor-meta"),
+        previewOutput: $("preview-output"),
+        previewMeta: $("preview-meta"),
+        autoPreview: $("auto-preview"),
+        toasts: $("toasts"),
+      };
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[ch]));
+      }
+
+      function formatBytes(bytes) {
+        const value = Number(bytes);
+        if (!Number.isFinite(value) || value < 0) return "—";
+        if (value < 1024) return `${value} B`;
+        if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+        return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+      }
+
+      function formatTime(epochSeconds) {
+        const value = Number(epochSeconds);
+        if (!Number.isFinite(value) || value <= 0) return "—";
+        return new Date(value * 1000).toLocaleString();
+      }
+
+      function toast(message, kind = "info") {
+        const node = document.createElement("div");
+        node.className = `toast ${kind}`;
+        node.textContent = message;
+        el.toasts.appendChild(node);
+        window.setTimeout(() => node.remove(), 4200);
+      }
+
+      async function api(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        const init = { cache: "no-store", ...options, headers };
+
+        if (init.method === "POST") {
+          headers["Content-Type"] = "application/json";
+          headers["X-NekoTool-Dashboard"] = "1";
+        }
+
+        const response = await fetch(path, init);
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          throw new Error((payload && payload.error) || `HTTP ${response.status}`);
+        }
+        return payload || {};
+      }
+
+      function setApiState(online, text) {
+        el.apiPill.classList.toggle("online", Boolean(online));
+        el.apiPill.classList.toggle("offline", !online);
+        el.apiText.textContent = text;
+      }
+
+      function batteryColor(level) {
+        if (level == null) return "var(--dim)";
+        if (level <= 20) return "var(--red)";
+        if (level <= 45) return "var(--gold)";
+        return "var(--green)";
+      }
+
+      function renderDevices(payload) {
+        const online = Boolean(payload && payload.online);
+        const devices = (payload && payload.status && Array.isArray(payload.status.devices))
+          ? payload.status.devices
+          : [];
+
+        setApiState(online, online ? "StatusCast 在线" : "StatusCast 离线");
+        el.offlineBanner.classList.toggle("hidden", online);
+        if (!online) {
+          el.offlineText.textContent = `无法读取 StatusCast：${(payload && payload.error) || "连接失败"}`;
+        }
+
+        el.devicesUpdated.textContent = online
+          ? `更新于 ${new Date().toLocaleTimeString()}`
+          : "等待 StatusCast 启动";
+
+        const displayDevices = devices.length
+          ? devices
+          : [
+              {
+                platform: "ios",
+                displayName: "iPhone",
+                error: online ? "等待 iPhone 采集数据…" : "StatusCast API 未运行",
+              },
+              {
+                platform: "android",
+                displayName: "Android",
+                error: online ? "等待 Android 采集数据…" : "StatusCast API 未运行",
+              },
+            ];
+
+        el.deviceGrid.innerHTML = displayDevices.map((device) => {
+          const level = Number.isFinite(Number(device.batteryLevel)) ? Number(device.batteryLevel) : null;
+          const hasData = !device.error && (level != null || device.model);
+          const name = device.displayName || device.model || "未知设备";
+          const platform = device.platform === "android" ? "ANDROID" : "IPHONE";
+          const icon = device.platform === "android" ? "🤖" : "📱";
+          const charging = device.isCharging === true;
+          const color = batteryColor(level);
+          const media = device.mediaTitle
+            ? `🎵 ${device.mediaTitle}${device.mediaArtist ? ` — ${device.mediaArtist}` : ""}`
+            : "🎵 暂无播放";
+          const foreground = device.foregroundAppName || device.foregroundApp;
+          const modelText = [device.model, device.platform].filter(Boolean).join(" · ");
+
+          return `
+            <article class="device-card ${hasData ? "" : "is-offline"}">
+              <div class="device-top">
+                <span class="device-platform">${icon} ${escapeHtml(platform)}</span>
+                <span class="device-state ${hasData ? "online" : ""}">
+                  <span class="dot"></span>${hasData ? "在线" : "离线"}
+                </span>
+              </div>
+              <div class="device-body">
+                <div class="battery-ring ${level == null ? "unknown" : ""}" style="--level:${level ?? 0};--ring:${color}">
+                  <span>${level == null ? "?" : `${level}%`}</span>
+                </div>
+                <div class="device-main">
+                  <h3 class="device-name">${escapeHtml(name)}</h3>
+                  <p class="device-model">${escapeHtml(modelText || "型号未知")}</p>
+                  <span class="device-charge ${charging ? "charging" : ""}">
+                    ${charging ? "⚡ 充电中" : "🔋 未充电"}
+                  </span>
+                </div>
+              </div>
+              <div class="device-details">
+                <div><span>${escapeHtml(media)}</span></div>
+                ${foreground ? `<div><span>前台：${escapeHtml(foreground)}</span></div>` : ""}
+                ${device.updatedAt ? `<div><span>更新时间：${escapeHtml(formatTime(device.updatedAt))}</span></div>` : ""}
+              </div>
+              ${device.error ? `<div class="device-error">${escapeHtml(device.error)}</div>` : ""}
+            </article>
+          `;
+        }).join("");
+      }
+
+      async function loadStatus() {
+        if (state.statusBusy) return;
+        state.statusBusy = true;
+        try {
+          const payload = await api("/api/status");
+          renderDevices(payload);
+        } catch (error) {
+          renderDevices({ online: false, error: String(error.message || error) });
+        } finally {
+          state.statusBusy = false;
+        }
+      }
+
+      function renderPlugins() {
+        const enabled = state.plugins.filter((item) => item.enabled).length;
+        const disabled = state.plugins.length - enabled;
+        el.countEnabled.textContent = String(enabled);
+        el.countDisabled.textContent = String(disabled);
+        el.countTotal.textContent = String(state.plugins.length);
+
+        if (!state.plugins.length) {
+          el.pluginList.innerHTML = `<div class="empty">plugins/ 目录里还没有 .ps1 插件。<br>新建插件后点「刷新」。</div>`;
+          return;
+        }
+
+        el.pluginList.innerHTML = state.plugins.map((plugin) => `
+          <div class="plugin-row ${plugin.name === state.selected ? "selected" : ""} ${plugin.enabled ? "" : "disabled"}" data-name="${escapeHtml(plugin.name)}">
+            <div class="plugin-info">
+              <span class="plugin-name">${escapeHtml(plugin.name)}</span>
+              <span class="plugin-meta">${formatBytes(plugin.size)} · ${escapeHtml(formatTime(plugin.modified))}</span>
+            </div>
+            <div class="plugin-actions">
+              <span class="status-chip ${plugin.enabled ? "" : "off"}">${plugin.enabled ? "启用" : "禁用"}</span>
+              <label class="switch" title="${plugin.enabled ? "禁用插件" : "启用插件"}">
+                <input type="checkbox" data-toggle="${escapeHtml(plugin.name)}" ${plugin.enabled ? "checked" : ""}>
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      function updateEditorMeta() {
+        const text = el.editor.value;
+        const lines = text ? text.split(/\n/).length : 0;
+        el.editorMeta.textContent = state.selected
+          ? `${lines} 行 · ${text.length} 字符`
+          : "未选择文件";
+      }
+
+      function markDirty(dirty) {
+        state.dirty = Boolean(dirty);
+        el.dirtyBadge.classList.toggle("hidden", !state.dirty);
+        el.saveButton.disabled = !state.selected || !state.dirty;
+      }
+
+      function setEditorEnabled(enabled) {
+        el.editor.disabled = !enabled;
+        el.editorHint.classList.toggle("hidden", enabled);
+      }
+
+      async function selectPlugin(name) {
+        if (!name || name === state.selected) return;
+        if (state.dirty && !window.confirm("当前插件有未保存修改，确定放弃吗？")) {
+          return;
+        }
+
+        try {
+          const payload = await api(`/api/plugins/content?name=${encodeURIComponent(name)}`);
+          state.selected = payload.name;
+          el.editor.value = payload.content || "";
+          el.editorTitle.textContent = payload.name;
+          el.editorPath.textContent = payload.enabled ? "plugins/" + payload.name : "plugins/" + payload.name + ".disabled";
+          setEditorEnabled(true);
+          markDirty(false);
+          updateEditorMeta();
+          renderPlugins();
+          el.editor.focus();
+        } catch (error) {
+          toast(`读取插件失败：${error.message}`, "bad");
+        }
+      }
+
+      async function loadPlugins() {
+        try {
+          const payload = await api("/api/plugins");
+          state.plugins = Array.isArray(payload.plugins) ? payload.plugins : [];
+
+          if (state.selected && !state.plugins.some((item) => item.name === state.selected)) {
+            state.selected = null;
+            el.editor.value = "";
+            el.editorTitle.textContent = "插件编辑器";
+            el.editorPath.textContent = "";
+            setEditorEnabled(false);
+            markDirty(false);
+            updateEditorMeta();
+          }
+
+          if (state.selected) {
+            const current = state.plugins.find((item) => item.name === state.selected);
+            if (current) {
+              el.editorPath.textContent = current.enabled
+                ? "plugins/" + current.name
+                : "plugins/" + current.name + ".disabled";
+            }
+          }
+
+          renderPlugins();
+        } catch (error) {
+          el.pluginList.innerHTML = `<div class="empty">读取插件失败：${escapeHtml(error.message)}</div>`;
+          toast(`读取插件列表失败：${error.message}`, "bad");
+        }
+      }
+
+      async function togglePlugin(name, enabled) {
+        try {
+          const payload = await api("/api/plugins/toggle", {
+            method: "POST",
+            body: JSON.stringify({ name, enabled }),
+          });
+          toast(`${enabled ? "已启用" : "已禁用"} ${payload.name}`, "ok");
+          await loadPlugins();
+        } catch (error) {
+          toast(`切换失败：${error.message}`, "bad");
+          await loadPlugins();
+        }
+      }
+
+      async function savePlugin() {
+        if (!state.selected) return;
+        if (state.dirty && !window.confirm(`保存 ${state.selected}？旧版本会备份为 .bak。`)) {
+          return;
+        }
+
+        el.saveButton.disabled = true;
+        try {
+          const payload = await api("/api/plugins/save", {
+            method: "POST",
+            body: JSON.stringify({ name: state.selected, content: el.editor.value }),
+          });
+          markDirty(false);
+          toast(`已保存 ${payload.name}（备份：${payload.backup}）`, "ok");
+          await loadPlugins();
+        } catch (error) {
+          toast(`保存失败：${error.message}`, "bad");
+          el.saveButton.disabled = false;
+        }
+      }
+
+      async function refreshPreview() {
+        if (state.previewBusy) return;
+        state.previewBusy = true;
+        const button = $("btn-refresh-preview");
+        button.disabled = true;
+        el.previewMeta.textContent = "运行中…";
+        el.previewMeta.className = "preview-meta";
+
+        try {
+          const payload = await api("/api/preview", { method: "POST" });
+          const text = payload.output || "(无输出)";
+          el.previewOutput.textContent = text;
+          el.previewOutput.classList.toggle("error", !payload.ok);
+
+          if (payload.ok) {
+            el.previewMeta.textContent = `成功 · ${payload.elapsedMs ?? "?"} ms · ${new Date().toLocaleTimeString()}`;
+            el.previewMeta.className = "preview-meta ok";
+          } else {
+            el.previewMeta.textContent = `失败 · ${payload.elapsedMs ?? "?"} ms`;
+            el.previewMeta.className = "preview-meta bad";
+            if (payload.error) {
+              el.previewOutput.textContent = `${text}\n\n[stderr]\n${payload.error}`;
+            }
+          }
+        } catch (error) {
+          el.previewOutput.textContent = `预览失败：${error.message}`;
+          el.previewOutput.classList.add("error");
+          el.previewMeta.textContent = "失败";
+          el.previewMeta.className = "preview-meta bad";
+        } finally {
+          state.previewBusy = false;
+          button.disabled = false;
+        }
+      }
+
+      async function copyPreview() {
+        const text = el.previewOutput.textContent || "";
+        try {
+          await navigator.clipboard.writeText(text);
+          toast("预览已复制", "ok");
+        } catch {
+          const area = document.createElement("textarea");
+          area.value = text;
+          document.body.appendChild(area);
+          area.select();
+          document.execCommand("copy");
+          area.remove();
+          toast("预览已复制", "ok");
+        }
+      }
+
+      el.pluginList.addEventListener("click", (event) => {
+        if (event.target.closest(".switch")) return;
+        const row = event.target.closest(".plugin-row");
+        if (row) selectPlugin(row.dataset.name);
+      });
+
+      el.pluginList.addEventListener("change", (event) => {
+        const input = event.target.closest("input[data-toggle]");
+        if (input) togglePlugin(input.dataset.toggle, input.checked);
+      });
+
+      el.editor.addEventListener("input", () => {
+        markDirty(true);
+        updateEditorMeta();
+      });
+
+      el.saveButton.addEventListener("click", savePlugin);
+      $("btn-refresh-all").addEventListener("click", () => {
+        loadStatus();
+        loadPlugins();
+        refreshPreview();
+      });
+      $("btn-refresh-plugins").addEventListener("click", loadPlugins);
+      $("btn-refresh-preview").addEventListener("click", refreshPreview);
+      $("btn-copy-preview").addEventListener("click", copyPreview);
+      el.autoPreview.addEventListener("change", () => {
+        if (el.autoPreview.checked) refreshPreview();
+      });
+
+      window.addEventListener("keydown", (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+          event.preventDefault();
+          savePlugin();
+        }
+      });
+
+      window.addEventListener("beforeunload", (event) => {
+        if (state.dirty) {
+          event.preventDefault();
+          event.returnValue = "";
+        }
+      });
+
+      loadStatus();
+      loadPlugins();
+      refreshPreview();
+
+      window.setInterval(loadStatus, 2000);
+      window.setInterval(() => {
+        if (el.autoPreview.checked && !document.hidden) refreshPreview();
+      }, 10000);
+    })();
+  </script>
+</body>
+</html>

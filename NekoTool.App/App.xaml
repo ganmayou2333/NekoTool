@@ -1,0 +1,100 @@
+<Application
+    x:Class="NekoTool.App.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    RequestedTheme="Dark">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- =========================================================
+                 NekoTool palette
+                 Surfaces are deliberately semi-transparent so Mica can
+                 breathe through the navigation pane and content area.
+                 ========================================================= -->
+            <SolidColorBrush x:Key="NekoTextPrimaryBrush" Color="#FFF7F8FA" />
+            <SolidColorBrush x:Key="NekoTextSecondaryBrush" Color="#FFB7BEC7" />
+            <SolidColorBrush x:Key="NekoTextMutedBrush" Color="#FF8F98A0" />
+            <SolidColorBrush x:Key="NekoGreenBrush" Color="#FF90BA3C" />
+            <SolidColorBrush x:Key="NekoGreenSoftBrush" Color="#2690BA3C" />
+            <SolidColorBrush x:Key="NekoCardBackgroundBrush" Color="#CC191B1F" />
+            <SolidColorBrush x:Key="NekoCardElevatedBrush" Color="#F21F2227" />
+            <SolidColorBrush x:Key="NekoCardBorderBrush" Color="#22FFFFFF" />
+            <SolidColorBrush x:Key="NekoInputBackgroundBrush" Color="#CC101215" />
+            <SolidColorBrush x:Key="NekoHoverBrush" Color="#18FFFFFF" />
+            <SolidColorBrush x:Key="NekoDividerBrush" Color="#14FFFFFF" />
+
+            <!-- Every card in the app uses the same 12 px radius. -->
+            <Style x:Key="NekoCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource NekoCardBackgroundBrush}" />
+                <Setter Property="BorderBrush" Value="{StaticResource NekoCardBorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="12" />
+            </Style>
+
+            <Style x:Key="NekoChipStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource NekoGreenSoftBrush}" />
+                <Setter Property="BorderBrush" Value="#3690BA3C" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="999" />
+                <Setter Property="Padding" Value="8,2" />
+            </Style>
+
+            <Style x:Key="NekoSectionTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="26" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource NekoTextPrimaryBrush}" />
+            </Style>
+
+            <Style x:Key="NekoCardTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource NekoTextPrimaryBrush}" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            </Style>
+
+            <Style x:Key="NekoMutedTextStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="Foreground" Value="{StaticResource NekoTextMutedBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="NekoBodyTextStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="{StaticResource NekoTextSecondaryBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="NekoSecondaryButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="#16FFFFFF" />
+                <Setter Property="BorderBrush" Value="#28FFFFFF" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Padding" Value="14,8" />
+                <Setter Property="Foreground" Value="{StaticResource NekoTextPrimaryBrush}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+
+            <Style x:Key="NekoAccentButtonStyle"
+                   TargetType="Button"
+                   BasedOn="{StaticResource AccentButtonStyle}">
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Padding" Value="16,8" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+
+            <Style x:Key="NekoIconButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="32" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="CornerRadius" Value="9" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Foreground" Value="{StaticResource NekoTextMutedBrush}" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

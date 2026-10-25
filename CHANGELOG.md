@@ -10,6 +10,44 @@ StatusCast release it targets.
 
 - Planned: more sample plugins, richer OBS widgets and a plugin manager UI.
 
+### Added
+
+- Web Dashboard (`web/dashboard.html`, `scripts/dashboard_server.py`,
+  `scripts/dashboard.ps1`): local-only glassmorphism control center with:
+  - live iPhone/Android cards from the StatusCast API;
+  - plugin list with `.ps1` ↔ `.ps1.disabled` toggles;
+  - in-browser plugin editor with atomic saves, `.bak` backups and UTF-8 BOM output;
+  - live `ultimate_status.ps1` preview with a 25-second timeout.
+- Zero-dependency Python stdlib backend on `127.0.0.1:5100`; no Node.js,
+  frontend framework, Flask or StatusCast C# changes.
+- `NekoTool.App` native WinUI 3 desktop shell:
+  - pure native main window: `NavigationView`, dark theme, Mica backdrop with
+    Acrylic fallback, 12px translucent cards;
+  - plugins view with a Steam presence card, OBS settings `Expander`, plugin
+    `ListView` with drag handle, toggle, edit/delete actions;
+  - seamless right-side `SplitView` editor using a native monospace `TextBox`;
+  - settings view for startup, silent-run and local port;
+  - Steam profile is read from `HKCU\Software\Valve\Steam` and
+    `config\loginusers.vdf`, with the avatar resolved from the community profile XML;
+  - OBS link generation and an on-demand `PreviewWindow`; WebView2 exists only
+    inside that window and is released when it closes;
+  - this stage uses in-memory demo plugin data; Dashboard API hookup is next;
+  - self-contained single-file publish via `scripts/build_app.ps1`.
+
+### Documentation
+
+- Added `update.md`: 已测/待测项 for StatusCast USB/Wi-Fi,
+  Dashboard, NekoTool.App, and the remaining Apple service compatibility checks.
+- README now links the update/checklist file from a dedicated 待测清单 section
+  and lists `update.md` in the project tree.
+
+### Changed
+
+- 文档补充 iPhone 限制说明：真实 iPhone 不提供歌曲/歌手元数据（iOS MediaRemote
+  私有接口），`-MockMode` 中的媒体示例仅为模拟数据；Android 媒体需要 ADB。
+- 文档补充 iPhone Wi-Fi 采集现状：Microsoft Store 版 Apple Devices 不提供 Wi-Fi
+  发现，StatusCast 当前只使用 USB；Roadmap 标记 Wi-Fi 与 iPhone 媒体为暂缓项。
+
 ## [3.3.0] - 2026-10-25
 
 ### Added

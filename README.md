@@ -23,6 +23,9 @@ NekoTool 不负责 USB 采集。它只做一件事：把 **StatusCast** 已经�
 📱 主力机 | 🔋 87% ⚡ | 🎵 Yesterday - The Beatles | 🖥 33% | 🧠 63% | 🌐 ↓1.2M ↑86K | 🕐 21:53 | 🌤 晴 25℃
 ```
 
+> 这是 `-MockMode` 的模拟数据。真实 iPhone 目前不提供歌曲/歌手元数据，`🎵` 段不会显示；
+> Android 的媒体信息需要 StatusCast 侧启用 ADB 采集。
+
 如果想让 CPU / 内存 / 网速也使用固定演示值，加上 `-MockHardware`：
 
 ```powershell
@@ -66,6 +69,91 @@ plugins/*.ps1 ───▶ 天气 / 温度 / 自定义状态
 
 这样核心保持纯净，展示层可以独立演进。
 
+## 可视化控制台（Web Dashboard）
+
+NekoTool 自带一个只监听本机的 Web 控制台，用来管理设备状态、插件和最终输出：
+
+```powershell
+cd G:\StatusCast\NekoTool
+.\scripts\dashboard.ps1
+```
+
+默认打开 `http://127.0.0.1:5100/`。按 `Ctrl+C` 停止服务；只想启动服务、不自动开浏览器：
+
+```powershell
+.\scripts\dashboard.ps1 -NoBrowser
+.\scripts\dashboard.ps1 -Port 5101
+```
+
+面板包括：
+
+- **设备监控**：每 2 秒读取 StatusCast API，展示 iPhone / Android 的在线状态、电量、充电、机型和媒体字段；
+- **插件管理**：列出 `plugins/*.ps1`，用开关重命名为 `.ps1.disabled` 来启用/禁用；点击插件直接在网页里编辑并保存；
+- **状态预览**：运行 `ultimate_status.ps1`，展示最终拼接的一行文本（默认每 10 秒自动刷新，可手动刷新）。
+
+保存插件时会先备份为 `.bak`，并以 UTF-8 BOM + CRLF 写回，兼容 Windows PowerShell 5.1。控制台只绑定 `127.0.0.1`，不向局域网开放，也不会修改 StatusCast 的 C# 端。
+
+## 桌面外壳 NekoTool.App（原生 WinUI 3 + 独立预览）
+
+`NekoTool.App` 使用 **WinUI 3（Windows App SDK 1.8）**，主界面是 100% 原生控件：
+
+- `NavigationView`：顶部「插件管理」，底部 Footer「设置」；
+- 深色主题 + **Mica** 背景，Windows 10 回退到 Acrylic；
+- 全局 12px 大圆角、半透明深灰卡片；
+- 插件页：Steam 状态预览卡、OBS 挂件设置 `Expander`、插件 `ListView`；
+- 点击编辑时从右侧滑出原生等宽 `TextBox`（`SplitView`），不跳页、不嵌套 WebView2；
+- 设置页：开机自启、静默运行、本地端口。
+
+当前阶段是**纯前端原型（假数据）**：
+
+- Steam 账号从 `HKCU\Software\Valve\Steam` 读取安装目录，解析 `config\loginusers.vdf`
+  的 `PersonaName` / `SteamID64`，再从 Steam 社区资料 XML 获取 `avatarFull` 头像；
+- 插件列表、开关、编辑、保存、删除都使用内存演示数据；
+- OBS 链接指向 `web/widget.html`，可选择主题与透明背景；
+- 「预览挂件」打开独立的 `PreviewWindow`，只有这个窗口内部创建 WebView2；
+  关闭窗口时调用 `Close()` 并清空控件树，释放浏览器进程与 GPU 资源；
+- 主窗口没有 WebView2 嵌套。
+
+> 下一阶段会把这些假数据替换为 Dashboard API：
+> `/api/plugins`、`/api/plugins/content`、`/api/plugins/toggle`、`/api/plugins/save`。
+
+### 构建
+
+```powershell
+cd G:\StatusCast\NekoTool\NekoTool.App
+dotnet build -c Debug
+```
+
+发布自包含单文件：
+
+```powershell
+cd G:\StatusCast\NekoTool
+.\scripts\build_app.ps1
+```
+
+默认生成自包含单文件（体积约 200 MB）：
+
+```text
+NekoTool.App.exe        # dist 只有一个文件时复制到项目根目录
+dist\NekoTool.App.exe   # 发布目录
+```
+
+如果机器已安装 .NET 10 Desktop Runtime，可以生成更小的框架依赖版本：
+
+```powershell
+.\scripts\build_app.ps1 -FrameworkDependent
+```
+
+> WinUI 3 的单文件 exe 首次启动可能会把 Windows App SDK / WebView2 原生组件解压到临时目录，这是预期行为。
+
+命令行参数：
+
+```powershell
+.\NekoTool.App.exe --root "G:\StatusCast\NekoTool" --port 5100
+```
+
+前置条件：Microsoft Edge **WebView2 Evergreen Runtime**（Windows 11 通常已内置；否则从微软官网安装），以及 .NET 10 SDK（构建时）。默认自包含构建不需要目标机器额外安装 .NET。
+
 ## 目录结构
 
 ```text
@@ -75,6 +163,18 @@ NekoTool/
 ├─ .gitignore
 ├─ config.ps1                     # setup.ps1 生成，不提交
 ├─ requirements.txt               # 可选：心率采集器依赖 websocket-client
+├─ NekoTool.App/
+│  ├─ NekoTool.App.csproj         # WinUI 3 原生外壳
+│  ├─ App.xaml / App.xaml.cs      # 深色主题、全局样式、应用入口
+│  ├─ MainWindow.xaml / .xaml.cs  # NavigationView + Steam/OBS/插件/编辑器
+│  ├─ PreviewWindow.xaml / .xaml.cs # 独立 WebView2 预览窗口
+│  ├─ SettingsPage.xaml / .xaml.cs # 设置视图
+│  ├─ SteamProfileService.cs      # 注册表 + loginusers.vdf + 头像
+│  ├─ Models/PluginItem.cs        # 插件列表模型
+│  ├─ ViewModels/DashboardViewModel.cs # Steam/状态绑定
+│  ├─ ProjectLocator.cs           # --root / --port 与项目根定位
+│  └─ app.manifest
+├─ dist/                          # NekoTool.App 发布输出（不提交）
 ├─ collectors/
 │  └─ hr_collector.py             # v3.3 心率 WebSocket 采集器
 ├─ data/
@@ -87,14 +187,19 @@ NekoTool/
 │  ├─ setup.ps1                   # 一键交互式配置
 │  ├─ update.ps1                  # 版本检查 / git pull
 │  ├─ launch_and_pull.ps1         # 看门狗：自动启动 StatusCast 后取数
+│  ├─ dashboard.ps1               # Web 控制台启动器
+│  ├─ dashboard_server.py         # Web 控制台本地 API（Python 标准库）
+│  ├─ build_app.ps1               # 发布 NekoTool.App 单文件
 │  ├─ ultimate_status.ps1         # 终极版：手机 + 系统 + 插件
 │  ├─ pull_status.ps1             # 基础版：只读手机状态
 │  ├─ write_to_obs.ps1            # OBS 专用：循环写入本地 txt
 │  ├─ build_release.ps1           # 一键打包 StatusCast + NekoTool
 │  ├─ generate_preview.ps1        # 无头浏览器生成预览图
 │  └─ mock_data.json              # StatusCast 模拟数据
+├─ update.md                      # 本轮更新 / 待测清单
 └─ web/
    ├─ widget.html                 # OBS 浏览器源控制台
+   ├─ dashboard.html              # 可视化控制台页面
    └─ preview-mock.png            # README 预览图
 ```
 
@@ -170,8 +275,10 @@ update.ps1 -Quiet -AutoUpdate
 - PowerShell 5.1 或 PowerShell 7+
 - StatusCast 已安装，或已通过 `setup.ps1` 指定 `StatusCast.Daemon.exe`
 - OBS 28+（仅使用 OBS 功能时需要）
+- Web Dashboard：Python 3.10+
+- NekoTool.App：Microsoft Edge WebView2 Runtime；框架依赖构建另需 .NET 10 Desktop Runtime
 
-NekoTool 本身不需要 Python、.NET 或管理员权限（可选的心率采集器需要 Python 和 `websocket-client`）。
+NekoTool 的脚本层本身不需要 Python 或 .NET；Web Dashboard 与 WinUI 3 外壳是可选组件。
 
 ## 快速开始
 
@@ -515,6 +622,31 @@ Invoke-RestMethod -Uri 'http://localhost:5099/status/' -UseBasicParsing
 
 这些指标来自 Windows CIM / 网络适配器统计。部分精简系统或虚拟机可能禁用相关服务，此时只影响对应字段，不影响手机状态。
 
+### iPhone 的歌曲信息为什么不显示？
+
+iPhone 的 Now Playing / MediaRemote 是 iOS 私有接口，StatusCast 的
+`pymobiledevice3` 采集链没有可用的服务，因此当前 `mediaTitle` / `mediaArtist` 始终为空。
+NekoTool 会正常展示其它字段；Android 媒体信息需要 StatusCast 侧安装 ADB 并启用采集。
+
+### iPhone 能无线采集吗？
+
+当前不能。Store 版 Apple Devices 不提供 Wi-Fi 设备发现；切换到经典
+iTunes + Apple Mobile Device Support 19.4.0.10 后，在 iOS 27.0 上
+`usbmuxd` 仍然没有注册 `[Network]` 设备（Bonjour 只能完成 lockdown）。
+StatusCast 目前只使用 USB，详见
+[StatusCast Wi-Fi 预研记录](https://github.com/ganmayou2333/StatusCast/blob/main/docs/iphone-wireless-notes.md)
+与 [update.md](update.md)。
+
+## 待测清单
+
+当前已经验证和仍需复测的项目统一记录在
+[update.md](update.md)，包括：
+
+- StatusCast USB / Wi-Fi 预研结论；
+- Dashboard API 与浏览器 UI 测试状态；
+- NekoTool.App 单文件发布、WebView2、关窗后后端存活；
+- 待复测条件和下一步决策。
+
 ## Roadmap
 
 - [ ] 可配置的状态段开关（只显示 CPU / 内存 / 网速）
@@ -522,6 +654,8 @@ Invoke-RestMethod -Uri 'http://localhost:5099/status/' -UseBasicParsing
 - [ ] OBS WebSocket 直接推流
 - [ ] 多 StatusCast 实例支持
 - [ ] 托盘常驻版
+- [ ] iPhone Wi-Fi 采集（经典 AMDS 19.4 + iOS 27 未注册 Network，暂缓）
+- [ ] iPhone 媒体元数据（受 iOS MediaRemote 私有接口限制，暂缓）
 
 ## License
 
