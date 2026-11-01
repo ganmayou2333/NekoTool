@@ -290,6 +290,90 @@
       background: rgba(52, 211, 153, 0.12);
     }
 
+    .device.console .device-icon {
+      background: rgba(246, 196, 83, 0.14);
+    }
+
+    .device.node .device-icon {
+      background: rgba(129, 140, 248, 0.14);
+    }
+
+    .device.ble .device-icon {
+      background: rgba(52, 211, 153, 0.14);
+    }
+
+    .device.unknown .device-icon {
+      background: rgba(148, 163, 184, 0.14);
+    }
+
+    /* Online/offline + degraded transport chips ------------------ */
+
+    .chip {
+      display: inline-flex;
+      flex: 0 1 auto;
+      align-items: center;
+      gap: 3px;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      padding: 1px 5px;
+      border: 1px solid transparent;
+      border-radius: 99px;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.45;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chip .dot {
+      flex: 0 0 auto;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .chip.online {
+      color: var(--green);
+      background: rgba(52, 211, 153, 0.12);
+      border-color: rgba(52, 211, 153, 0.26);
+    }
+
+    .chip.offline {
+      color: var(--muted);
+      background: rgba(148, 163, 184, 0.12);
+      border-color: rgba(148, 163, 184, 0.22);
+    }
+
+    .chip.warn {
+      color: var(--gold);
+      background: rgba(246, 196, 83, 0.12);
+      border-color: rgba(246, 196, 83, 0.3);
+    }
+
+    .device.is-offline .device-name,
+    .device.is-offline .battery-value {
+      color: var(--muted);
+    }
+
+    /* The meta column already has spare height inside the 58px ring, so the
+       status chip rides along without making the card taller. */
+    .device-meta .chip {
+      align-self: flex-start;
+      margin-top: 1px;
+    }
+
+    .battery-value.is-unknown {
+      font-size: 12px;
+      letter-spacing: 0;
+    }
+
+    .ring.is-unknown {
+      box-shadow: none;
+    }
+
     .device-name {
       overflow: hidden;
       flex: 1;
@@ -776,7 +860,11 @@
       function appLine(device) {
         if (device.foregroundAppName) return `APP · ${escapeHtml(device.foregroundAppName)}`;
         if (device.foregroundApp) return `APP · ${escapeHtml(device.foregroundApp)}`;
-        return device.platform === "android" ? "ANDROID · ADB" : "IOS · USB";
+        const platform = platformOf(device);
+        const active = textOf(device.transport && device.transport.active).toLowerCase();
+        const channel = active && active !== "none" ? active.toUpperCase() : "";
+        if (channel) return `${escapeHtml(platform.toUpperCase())} · ${escapeHtml(channel)}`;
+        return platform === "android" ? "ANDROID · ADB" : "IOS · USB";
       }
 
       function animateNumber(element, target) {
@@ -804,38 +892,290 @@
       // -------------------------------------------------------
       // Device rendering
       // -------------------------------------------------------
+      // schema 3 platform -> card kind. Anything not listed falls back to the
+      // generic card so an unknown collector can never blank the widget.
+      const KIND_BY_PLATFORM = {
+        ios: "phone",
+        android: "phone",
+        console: "console",
+        steam: "console",
+        macos: "node",
+        linux: "node",
+        ble: "ble",
+      };
+
+      const PLATFORM_ICONS = {
+        ios: "📱",
+        android: "🤖",
+        console: "🎮",
+        steam: "🎮",
+        macos: "💻",
+        linux: "🐧",
+        ble: "📶",
+      };
+
+      const KIND_ICONS = {
+        phone: "📱",
+        console: "🎮",
+        node: "🖥️",
+        ble: "📶",
+        unknown: "❔",
+      };
+
+      // transport.active -> readable channel name for the degraded chip.
+      const TRANSPORT_LABELS = {
+        lan: "LAN 探活",
+        tcp: "TCP 探活",
+        arp: "ARP 探活",
+        ping: "PING 探活",
+        usb: "USB",
+        "usb-wifi": "Wi-Fi 通道",
+        adb: "ADB",
+        "adb-wifi": "ADB Wi-Fi",
+        ssh: "SSH",
+        ble: "BLE",
+        none: "仅探活",
+      };
+
+      const PLATFORM_FALLBACK_NAMES = {
+        ios: "iPhone",
+        android: "Android",
+        console: "主机",
+        steam: "Steam",
+        macos: "Mac",
+        linux: "Linux",
+        ble: "BLE 设备",
+      };
+
+      function platformOf(device) {
+        return String((device && device.platform) || "").trim().toLowerCase();
+      }
+
+      function textOf(value) {
+        return typeof value === "string" ? value.trim() : "";
+      }
+
+      function kindOf(device) {
+        return KIND_BY_PLATFORM[platformOf(device)] || "unknown";
+      }
+
+      function deviceName(device) {
+        const candidates = [
+          device.alias,
+          device.displayName,
+          device.model,
+          device.console && device.console.name,
+          device.ble && device.ble.name,
+          device.node && device.node.hostname,
+        ];
+        for (const candidate of candidates) {
+          const text = textOf(candidate);
+          if (text) return text;
+        }
+        const platform = platformOf(device);
+        return PLATFORM_FALLBACK_NAMES[platform]
+          || (platform ? `${platform} 设备` : "未知设备");
+      }
+
+      // Online/offline for every card kind, preferring the platform block's
+      // own flag over the generic transport liveness flag.
+      function deviceState(device, kind) {
+        const transport = device.transport;
+        const transportOnline = transport && typeof transport.online === "boolean"
+          ? transport.online
+          : null;
+
+        if (kind === "console") {
+          const block = device.console || {};
+          // A stale/failed collection round wins over the last known
+          // console.online, so a stale snapshot never reports online.
+          const online = device.error
+            ? false
+            : typeof block.online === "boolean"
+              ? block.online
+              : transportOnline !== null ? transportOnline : true;
+          return {
+            online,
+            text: online ? "在线" : (textOf(block.statusText) || "离线"),
+          };
+        }
+
+        if (kind === "node") {
+          const block = device.node || {};
+          const online = device.error
+            ? false
+            : typeof block.online === "boolean"
+              ? block.online
+              : transportOnline !== null ? transportOnline : true;
+          return {
+            online,
+            text: online ? "在线" : (textOf(block.statusText) || "离线"),
+          };
+        }
+
+        if (kind === "ble") {
+          const block = device.ble || {};
+          const connected = !device.error && block.connected === true;
+          const online = !device.error && (connected || transportOnline === true);
+          return {
+            online,
+            tone: connected ? "online" : online ? "warn" : "offline",
+            text: connected
+              ? "已连接"
+              : textOf(block.statusText) || (online ? "已发现未连接" : "未发现"),
+          };
+        }
+
+        const online = device.error
+          ? false
+          : transportOnline !== null ? transportOnline : true;
+        return { online, text: online ? "在线" : "离线" };
+      }
+
+      function statusChip(state) {
+        const tone = state.tone || (state.online ? "online" : "offline");
+        return `<span class="chip ${tone}"><span class="dot"></span>${escapeHtml(state.text)}</span>`;
+      }
+
+      // transport.degraded means "liveness only": make that visible instead of
+      // leaving it inside the JSON.
+      function degradedChip(device) {
+        const transport = device.transport;
+        if (!transport || transport.degraded !== true) return "";
+        const active = textOf(transport.active).toLowerCase();
+        const label = TRANSPORT_LABELS[active] || (active ? active.toUpperCase() : "降级");
+        const detail = textOf(transport.detail);
+        const title = `降级：只拿到存活信息${detail ? `（${detail}）` : ""}`;
+        return `<span class="chip warn" title="${escapeHtml(title)}">⚠️ 降级 · ${escapeHtml(label)}</span>`;
+      }
+
+      function formatClock(epochSeconds) {
+        const value = Number(epochSeconds);
+        if (!Number.isFinite(value) || value <= 0) return "";
+        return new Date(value * 1000).toLocaleTimeString("zh-CN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      function formatUptime(seconds) {
+        if (seconds === null || seconds === undefined || seconds === "") return "";
+        const value = Number(seconds);
+        if (!Number.isFinite(value) || value < 0) return "";
+        const days = Math.floor(value / 86400);
+        const hours = Math.floor((value % 86400) / 3600);
+        const minutes = Math.floor((value % 3600) / 60);
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+      }
+
+      // Two footer lines. Phones keep the original media/app layout; every
+      // other platform shows the facts it actually carries.
+      function detailLines(device, kind) {
+        if (device.error) {
+          return ["", `⚠️ ${escapeHtml(textOf(device.error))}`];
+        }
+
+        if (kind === "console") {
+          const block = device.console || {};
+          const transport = device.transport || {};
+          const type = textOf(block.type);
+          const seen = formatClock(block.lastSeenAt);
+          const method = textOf(block.method) || textOf(transport.detail) || textOf(transport.active);
+          const channel = method ? escapeHtml(method.toUpperCase()) : "LAN";
+          const first = `🎮 ${escapeHtml(type ? type.toUpperCase() : "主机")}`;
+          const second = deviceState(device, kind).online
+            ? channel
+            : (seen ? `上次在线 ${escapeHtml(seen)}` : "—");
+          return [first, second];
+        }
+
+        if (kind === "node") {
+          const block = device.node || {};
+          const uptime = formatUptime(block.uptimeSeconds);
+          const first = uptime
+            ? `⏱️ 运行 ${escapeHtml(uptime)}`
+            : `🖥️ ${escapeHtml(platformOf(device).toUpperCase())}`;
+          const second = textOf(block.hostname)
+            || (block.ssh === false ? "SSH 不可用" : "SSH");
+          return [first, escapeHtml(second)];
+        }
+
+        if (kind === "ble") {
+          const block = device.ble || {};
+          const heartRate = Number(block.heartRate);
+          const rssi = Number(block.rssi);
+          let first;
+          if (Number.isFinite(heartRate) && heartRate > 0) {
+            first = `❤️ ${Math.round(heartRate)} BPM`;
+          } else if (Number.isFinite(rssi)) {
+            first = `📶 RSSI ${Math.round(rssi)}`;
+          } else {
+            first = "📶 BLE 外设";
+          }
+          const services = Array.isArray(block.services)
+            ? block.services.filter((item) => textOf(item)).join("/")
+            : "";
+          const second = textOf(block.address) || services || "BLE";
+          return [first, escapeHtml(second)];
+        }
+
+        if (kind === "unknown") {
+          const platform = platformOf(device);
+          const first = `❔ 未知平台${platform ? ` · ${escapeHtml(platform)}` : ""}`;
+          const second = textOf(device.model) || textOf(device.id) || "—";
+          return [first, escapeHtml(second)];
+        }
+
+        // phone (ios / android): unchanged media + app lines.
+        return [mediaLine(device), appLine(device)];
+      }
+
       function renderDevice(device) {
+        const kind = kindOf(device);
+        const platform = platformOf(device);
+        const state = deviceState(device, kind);
         const level = Number.isFinite(device.batteryLevel)
           ? clamp(Math.round(device.batteryLevel), 0, 100)
           : null;
-        const platform = device.platform === "android" ? "android" : "ios";
-        const icon = platform === "android" ? "🤖" : "📱";
-        const name = device.displayName || device.model || (platform === "android" ? "Android" : "iPhone");
-        const accent = accentFor(level);
         const charging = device.isCharging === true;
-        const value = level === null ? "--" : String(level);
+        const icon = PLATFORM_ICONS[platform] || KIND_ICONS[kind] || "❔";
+        const name = deviceName(device);
+        const accent = accentFor(level);
+        const value = level === null ? "未知" : String(level);
+        const unit = level === null ? "" : '<span class="unit">%</span>';
+        const batteryState = charging ? "CHARGING" : level === null ? "未知" : "ON BATTERY";
+        const [detailA, detailB] = detailLines(device, kind);
+        const classes = [
+          "device",
+          kind,
+          platform && platform !== kind && /^[a-z0-9-]+$/.test(platform) ? platform : "",
+          state.online ? "" : "is-offline",
+        ].filter(Boolean).join(" ");
 
         return `
-          <article class="device ${platform}">
+          <article class="${classes}">
             <div class="device-head">
               <span class="device-icon">${icon}</span>
               <span class="device-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
               ${charging ? '<span class="bolt" title="充电中">⚡</span>' : ""}
             </div>
             <div class="device-body">
-              <div class="ring" style="--level:${level ?? 0};--accent:${accent}">
+              <div class="ring${level === null ? " is-unknown" : ""}" style="--level:${level ?? 0};--accent:${accent}">
                 <div class="ring-inner">
-                  <span class="battery-value" data-current="0">${value}</span>
-                  <span class="unit">%</span>
+                  <span class="battery-value${level === null ? " is-unknown" : ""}" data-current="0">${value}</span>
+                  ${unit}
                 </div>
               </div>
               <div class="device-meta">
                 <span class="label">BATTERY</span>
-                <span class="state">${charging ? "CHARGING" : level === null ? "OFFLINE" : "ON BATTERY"}</span>
+                <span class="state">${batteryState}</span>
+                ${statusChip(state)}
               </div>
             </div>
-            <div class="device-media">${mediaLine(device)}</div>
-            <div class="device-app">${appLine(device)}</div>
+            <div class="device-media">${detailA}</div>
+            <div class="device-app">${degradedChip(device) || detailB}</div>
           </article>
         `;
       }
@@ -849,7 +1189,10 @@
         }
 
         devicesEl.innerHTML = currentDevices.map(renderDevice).join("");
-        deviceCountEl.textContent = `${currentDevices.length} ONLINE`;
+        const onlineCount = currentDevices
+          .filter((device) => deviceState(device, kindOf(device)).online)
+          .length;
+        deviceCountEl.textContent = `${onlineCount} ONLINE`;
 
         // Animate from the previous value, but render the first frame at the
         // target so previews/screenshots never catch a half-finished number.
