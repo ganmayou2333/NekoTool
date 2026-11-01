@@ -30,3 +30,5 @@
 验证：真实 headless Edge + 合成 `/api/status`，8 项断言全绿——console 卡不再显示成 IPHONE、ble 已连接/已发现未连接、node 卡、降级胶囊、未知平台兜底、首轮无 toast、转变后出现 toast。截图 `G:\StatusCast\.tmp-b02\dashboard-b02.png`。
 
 **未验证**：只测了 Chromium（无 Firefox/Safari）；「上线」方向的 toast 与「离线」走同一分支，但没有单独构造用例；toast 4.2 秒后自动消失，是靠轮询采样捕捉的。
+
+**2026-11-01 11:34 — 追加：widget 侧同样在真实 daemon 数据下验证过**（3 张卡、NekoTrak app 卡、TRACKER/挂台中）。dashboard 用的仍是合成 `/api/status`，因为它的数据来自 `dashboard_server.py` 代理；两者的渲染函数走同一套 kind 分派。

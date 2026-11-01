@@ -40,3 +40,12 @@
 **过程记录**：这张票最初派给 teammate 实现，但它汇报完成后磁盘上 `web/widget.html` 的 mtime 仍是 10:52（早于上一次提交），改动实际没落盘。由 lead 重做并验证。以后派工要检查文件 mtime 与 `git status` 再采信汇报。
 
 **未验证**：只有 Chromium；`pomodoro`、`nekotrak.source` 等票外字段没有展示；截图用的是合成数据，没起真 daemon。
+
+**2026-11-01 11:34 — 追加：真实 daemon 数据下的端到端验证（不是合成 payload）。**
+
+起真实 `StatusCast.Daemon.exe` 后：
+
+- `GET /health` → `{"ok":true,"deviceCount":3,"generatedAt":...,"schema":3}`
+- `GET /status/` 的 device ids = `["iphone","android","nekotrak"]`；`nekotrak` 条目的键集合**恰好**是契约里的 13 个，`error:null`、`transport.active:"process"`、`uptimeSec:6351`、`trackerActive:true`
+- widget 用 `?url=http://127.0.0.1:5099/status/` 加载真实快照：渲染出 3 张卡、`class="device app` 卡存在、显示 TRACKER 与「挂台中」
+- `write_to_obs.ps1 -Once` 一轮 **0.1 秒**，写出 `🎮 挂台中 · 🔋 未知`
