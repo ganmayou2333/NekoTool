@@ -547,14 +547,30 @@ ${(Invoke-RestMethod -Uri 'http://localhost:5099/status/' -UseBasicParsing).text
 
 ### 终极缝合状态
 
+NekoTrak 的自定义文本命令有 **5 秒硬超时**，而拼接这一行要跑网速采样和插件子进程，实测约 **8 秒**。所以不要让 NekoTrak 直接调用 `ultimate_status.ps1`：那样每次刷新都会 `custom_text_command_failed`（日志里 `elapsed_ms≈5010`，每分钟一条），presence 永远不更新。
+
+正确做法是**写的人和读的人分开**：
+
+1. `write_to_obs.ps1` 在自己的循环里调用 `ultimate_status.ps1`，把结果原子写入 `obs_status.txt`（每轮约 8 秒，默认间隔 10 秒）。
+2. NekoTrak 只读这个文件，毫秒级返回：
+
 ```text
-{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\StatusCast\NekoTool\scripts\ultimate_status.ps1"}
+${powershell.exe -NoProfile -Command "Get-Content -Raw 'G:\StatusCast\NekoTool\obs_status.txt'"}
 ```
 
-如果 NekoTrak 的刷新间隔比较短，建议使用 `-SampleSeconds 0.5`，避免每次采样占用太久：
+`setup.ps1` 会生成上面这条命令，并可选把写入器加进开机启动项。已经配错的机器可以直接改回来：
 
-```text
-{powershell.exe -NoProfile -ExecutionPolicy Bypass -File "G:\StatusCast\NekoTool\scripts\ultimate_status.ps1" -SampleSeconds 0.5}
+```powershell
+.\scripts\point-nekotrak-presence.ps1 -WhatIfMode   # 先看要改什么，不动文件
+.\scripts\point-nekotrak-presence.ps1              # 备份后应用
+```
+
+改完**重启 NekoTrak** 生效。验证方式：它日志里的 `custom_text_command_failed` 不再每分钟出现。
+
+调试时可以只写一轮：
+
+```powershell
+.\scripts\write_to_obs.ps1 -Once
 ```
 
 ## 脚本参数
