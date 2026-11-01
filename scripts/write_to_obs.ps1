@@ -195,11 +195,19 @@ Write-Host "Style:             $Style"
 Write-Host "Refresh interval:  $IntervalSeconds s"
 Write-Host 'Press Ctrl+C to stop.'
 
+# How many rounds in a row failed to read /status/. After three (~30 s) the
+# presence line is replaced with an explicit unknown line: keeping the last
+# good line forever would show a stale 87% battery as if it were current.
+$consecutiveFailures = 0
+$PRESENCE_FALLBACK = '🎮 挂台中 · 🔋 未知'
+$FAILURES_BEFORE_FALLBACK = 3
+
 while ($true) {
     $started = Get-Date
     try {
         $text = Get-StatusText
         Write-StatusFile -Text $text
+        $consecutiveFailures = 0
         $elapsed = ((Get-Date) - $started).TotalSeconds
         Write-Host ("[{0}] {1:0.0}s {2}" -f (Get-Date -Format 'HH:mm:ss'), $elapsed, $text)
         if ($elapsed -gt $IntervalSeconds) {
@@ -207,7 +215,21 @@ while ($true) {
         }
     }
     catch {
+        $consecutiveFailures++
         Write-Warning $_.Exception.Message
+        if ($Style -eq 'presence' -and $consecutiveFailures -ge $FAILURES_BEFORE_FALLBACK) {
+            try {
+                Write-StatusFile -Text $PRESENCE_FALLBACK
+                # Warn on the transition only: rewriting the same fallback is
+                # fine, warning about it every round is noise.
+                if ($consecutiveFailures -eq $FAILURES_BEFORE_FALLBACK) {
+                    Write-Warning ("status API unreachable for {0} rounds; wrote the unknown line" -f $consecutiveFailures)
+                }
+            }
+            catch {
+                Write-Warning $_.Exception.Message
+            }
+        }
     }
 
     if ($Once) {
