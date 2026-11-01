@@ -87,7 +87,7 @@ cd G:\StatusCast\NekoTool
 
 面板包括：
 
-- **设备监控**：每 2 秒读取 StatusCast API，展示 iPhone / Android 的在线状态、电量、充电、机型和媒体字段；
+- **设备监控**：每 2 秒读取 StatusCast API，按平台渲染卡片——手机（📱/🤖 电量环）、主机（🎮）、Mac/Linux 节点（💻/🐧）、BLE 外设（📶）、NekoTrak（🖥）。识别不了的平台会落到通用卡而不是消失；`transport.degraded` 为真时显示金色「⚠️ 降级 · LAN 探活」。设备在线↔离线切换会弹 toast，首帧只做基线不告警，同一轮多台变化合并成一条，避免网络抖动时刷屏；
 - **插件管理**：列出 `plugins/*.ps1`，用开关重命名为 `.ps1.disabled` 来启用/禁用；点击插件直接在网页里编辑并保存；
 - **状态预览**：运行 `ultimate_status.ps1`，展示最终拼接的一行文本（默认每 10 秒自动刷新，可手动刷新）。
 
@@ -348,17 +348,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ultimate_status.ps
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\write_to_obs.ps1
 ```
 
-默认每 5 秒把状态写入：
+默认每 10 秒刷新一次（一轮约 0.1 秒）。写入的内容由 `-Style` 决定：
+
+- `-Style presence`（默认）：`🎮 ELDEN RING · 🔋 主力机 87%⚡`，给 NekoTrak 的 Discord presence 用；
+- `-Style full`：原来的长行（CPU / 内存 / 网速 / 时间 / 插件），给 OBS 文本源用——这一轮要跑插件，约 8 秒。
+
+默认写入：
 
 ```text
 NekoTool\obs_status.txt
 ```
 
-也可以指定路径：
+也可以指定路径与间隔：
 
 ```powershell
 .\scripts\write_to_obs.ps1 -OutputPath 'D:\OBS\status.txt' -IntervalSeconds 3
+.\scripts\write_to_obs.ps1 -Style full -OutputPath 'D:\OBS\status.txt'
 ```
+
+文件是**原子替换**的（先写临时文件再换），所以读的一方永远看不到写了一半的行。
 
 在 OBS 中：
 

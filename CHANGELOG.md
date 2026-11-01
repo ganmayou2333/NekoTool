@@ -12,6 +12,54 @@ StatusCast release it targets.
 
 ### Added
 
+- `web/widget.html`: cards dispatch by platform instead of treating every
+  non-Android device as an iPhone — console/steam (🎮), Mac/Linux nodes
+  (💻/🐧), BLE peripherals (📶), NekoTrak (🖥) and a generic fallback card for
+  unknown platforms. `transport.degraded` renders as a warning chip so
+  "liveness only" is visible instead of living in the JSON, an absent battery
+  reads 未知 instead of a blank, and the header counts devices that are
+  actually online.
+- `web/widget.html`: the NekoTrak card has no battery ring (the app reports
+  none); it shows TRACKER state, uptime, current game or 挂台中, the pet line
+  and a warning chip when the collector reports `warns`.
+- `web/dashboard.html`: same platform dispatch for the device grid, plus
+  online/offline transition toasts. The first render only seeds the baseline;
+  several flips in one poll collapse into a single summary so a network blip
+  cannot bury the UI.
+- `scripts/write_to_obs.ps1`: `-Style presence|full` (default `presence`). The
+  presence line is built straight from `/status/`
+  (`🎮 <game or 挂台中> · 🔋 <name> <level>%[⚡] · 🍅 <mm:ss>`), so a round takes
+  ~0.1 s instead of ~8 s; `full` keeps the old long line for OBS. The file is
+  swapped atomically and each round only sleeps the remainder of the interval.
+- `scripts/point-nekotrak-presence.ps1`: points NekoTrak's custom text at
+  `obs_status.txt` with a timestamped backup, a `-WhatIfMode` preview and
+  idempotent re-runs. Edits raw JSON text so NekoTrak's deeply nested settings
+  survive.
+- `scripts/probe_nekotrak_cdp.py`: opt-in, read-only CDP probe for NekoTrak's
+  pomodoro state (the plaintext data root has none — every database is
+  encrypted). Reports what the page exposes instead of guessing IPC names.
+- `scripts/ultimate_status.ps1`: one row per Mac/Linux node and per BLE
+  peripheral, plus a readable channel marker (`(LAN)`) when a phone was served
+  by a fallback transport.
+
+### Fixed
+
+- `scripts/write_to_obs.ps1` could never start on PowerShell 5.1:
+  `[CmdletBinding()]` plus a `Join-Path $PSScriptRoot` parameter default fails
+  during binding, because `$PSScriptRoot` does not exist yet. The default path
+  is now resolved in the body.
+- `scripts/write_to_obs.ps1`: the atomic swap passed a plain `$null` to
+  `File.Replace`, which binds to an empty string and throws "path is not of a
+  legal form"; it now passes `[NullString]::Value`.
+- `web/dashboard.html`: a device without a battery rendered as **0%**, because
+  `Number(null) === 0`. Null/undefined/"" are treated as unknown before
+  coercing.
+- NekoTrak's custom text timed out every refresh (2538
+  `custom_text_command_failed` records, `elapsed_ms` ~5010): the template ran
+  `ultimate_status.ps1` (~8.3 s) against a 5 s limit. NekoTool now keeps
+  `obs_status.txt` fresh in its own loop and NekoTrak only reads the file
+  (~190 ms).
+
 - `scripts/ultimate_status.ps1`: appends one `🎮 <主机名> <状态>` line per
   StatusCast `console` device, reading the additive `console.online` /
   `console.statusText` object. A device-level `error` (failed or stale
