@@ -17,7 +17,7 @@
 - [x] 用合成快照断言：主行仍是手机；只有节点时回退 `📱 -- | 🔋 -- | 🎵 --`
 - [x] 节点行、console 🎮 行、BLE 行、降级标记按预期出现
 - [x] 图标与措辞和 display-polish 01 / 02 一致
-- [ ] 改完 NekoTrak 日志仍零 `custom_text_command_failed`（不得把这一行写回超时线）
+- [x] 改完 NekoTrak 日志仍零 `custom_text_command_failed`（不得把这一行写回超时线）
 
 ## Comments
 
@@ -43,3 +43,5 @@
 **关于最后一条验收（2026-11-01 11:33 更正）**：原先我把它标成「不适用」是错的。NekoTrak 进程还是 09:48 启动的那个（PID 20884），模板改动要重启才生效——此刻日志里 `custom_text_command_failed` 仍在每分钟出现（最新 11:33:10，累计 2563 条，`elapsed_ms≈5010`），说明它**还在调旧的 `ultimate_status.ps1`**。
 
 重启后才会变成：NekoTrak 读 `obs_status.txt`（`write_to_obs.ps1 -Style presence` 写的快路径），`ultimate_status.ps1` 退出调用链，这一行变长也不再顶 5 秒超时。所以这一条和 04 一样，卡在同一次重启上。
+
+**2026-11-01 11:52 — 重启已发生，这一条可以打勾了。** NekoTrak 在 11:50:51 重启后，`custom_text_command_failed` 停在 11:50:12 那条（累计 2580 未再增长），说明调用链已切到读文件，`ultimate_status.ps1` 不再被每分钟调用。10 分钟口径见 04 的记录。
