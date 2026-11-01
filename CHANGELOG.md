@@ -12,6 +12,16 @@ StatusCast release it targets.
 
 ### Added
 
+- `scripts/ultimate_status.ps1`: appends one `🎮 <主机名> <状态>` line per
+  StatusCast `console` device, reading the additive `console.online` /
+  `console.statusText` object. A device-level `error` (failed or stale
+  collection round) wins over the last known `console.online`, so a stale
+  snapshot never reports a console as online; legacy snapshots without the
+  object still fall back to the old `-not error` check.
+- `scripts/ultimate_status.ps1`: the primary phone line only accepts
+  `platform` `ios` / `android`, so a battery-carrying macOS/Linux node (e.g. a
+  MacBook) can no longer be selected and rendered as 📱; with no phone entry
+  the line falls back to `📱 -- | 🔋 -- | 🎵 --`.
 - Web Dashboard (`web/dashboard.html`, `scripts/dashboard_server.py`,
   `scripts/dashboard.ps1`): local-only glassmorphism control center with:
   - live iPhone/Android cards from the StatusCast API;
@@ -43,6 +53,9 @@ StatusCast release it targets.
 
 ### Changed
 
+- Console offline semantics follow the daemon: `error` stays `null`, the state
+  is `console.online` and the offline text comes from `console.statusText`
+  (`offlineText` config key, default 离线).
 - 文档补充 iPhone 限制说明：真实 iPhone 不提供歌曲/歌手元数据（iOS MediaRemote
   私有接口），`-MockMode` 中的媒体示例仅为模拟数据；Android 媒体需要 ADB。
 - 文档补充 iPhone Wi-Fi 采集现状：Microsoft Store 版 Apple Devices 不提供 Wi-Fi

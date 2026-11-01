@@ -106,20 +106,28 @@ function Get-MockPhoneText {
 function Get-PhoneText {
     try {
         $status = Invoke-RestMethod -Uri $StatusUrl -UseBasicParsing -TimeoutSec 5
+        $script:StatusData = $status
 
         # StatusCast v3: only a devices array is guaranteed.
         if ($null -ne $status.devices) {
             $devices = @($status.devices)
+            # The primary line only accepts real phones. Battery-carrying
+            # macos/linux nodes (e.g. a MacBook) must never be picked here,
+            # otherwise they would be rendered with the phone icon.
             $primary = $devices |
                 Where-Object { $_.platform -eq 'ios' -and $null -ne $_.batteryLevel } |
                 Select-Object -First 1
             if ($null -eq $primary) {
                 $primary = $devices |
-                    Where-Object { $null -ne $_.batteryLevel } |
+                    Where-Object {
+                        ($_.platform -eq 'ios' -or $_.platform -eq 'android') -and ($null -ne $_.batteryLevel)
+                    } |
                     Select-Object -First 1
             }
             if ($null -eq $primary) {
-                $primary = $devices | Select-Object -First 1
+                $primary = $devices |
+                    Where-Object { $_.platform -eq 'ios' -or $_.platform -eq 'android' } |
+                    Select-Object -First 1
             }
 
             if ($null -ne $primary) {
@@ -139,6 +147,36 @@ function Get-PhoneText {
     }
 
     return '📱 -- | 🔋 -- | 🎵 --'
+}
+
+function Get-ConsoleTexts {
+    $lines = @()
+    if ($null -eq $script:StatusData) { return $lines }
+
+    foreach ($dev in @($script:StatusData.devices)) {
+        if ($dev.platform -ne 'console') { continue }
+
+        # macos/linux nodes get their own rows in C3; only consoles here.
+
+        $c = $dev.console
+        $name = if ($dev.displayName) { $dev.displayName }
+            elseif ($dev.model) { $dev.model }
+            else { '主机' }
+
+        # A device-level error (stale pipeline, failed refresh) wins over the
+        # last known console.online so a stale snapshot never reports online;
+        # otherwise console.online decides, and statusText carries the text.
+        if ($dev.error -or ($null -ne $c -and $c.online -eq $false)) {
+            $state = if ($null -ne $c -and $c.statusText) { [string]$c.statusText } else { '离线' }
+        }
+        else {
+            $state = '在线'
+        }
+
+        $lines += "🎮 $name $state"
+    }
+
+    return $lines
 }
 
 function Get-PluginTexts {
@@ -293,6 +331,7 @@ $parts = @(
     $network,
     "🕐 $clock"
 )
+$parts += Get-ConsoleTexts
 $parts += $pluginTexts
 
 Write-Output ($parts -join ' | ')
