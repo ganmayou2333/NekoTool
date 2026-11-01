@@ -374,6 +374,23 @@
       box-shadow: none;
     }
 
+    /* NekoTrak card: the app reports liveness, not a battery level. */
+    .device.app .device-body.app-body {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 2px 0;
+      min-height: 40px;
+    }
+
+    .device.app .app-state {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--green);
+    }
+
     .device-name {
       overflow: hidden;
       flex: 1;
@@ -902,6 +919,7 @@
         macos: "node",
         linux: "node",
         ble: "ble",
+        windows: "app",
       };
 
       const PLATFORM_ICONS = {
@@ -912,6 +930,7 @@
         macos: "💻",
         linux: "🐧",
         ble: "📶",
+        windows: "🖥",
       };
 
       const KIND_ICONS = {
@@ -934,6 +953,7 @@
         "adb-wifi": "ADB Wi-Fi",
         ssh: "SSH",
         ble: "BLE",
+        process: "本地进程",
         none: "仅探活",
       };
 
@@ -945,6 +965,7 @@
         macos: "Mac",
         linux: "Linux",
         ble: "BLE 设备",
+        windows: "NekoTrak",
       };
 
       function platformOf(device) {
@@ -1023,6 +1044,16 @@
             text: connected
               ? "已连接"
               : textOf(block.statusText) || (online ? "已发现未连接" : "未发现"),
+          };
+        }
+
+        if (kind === "app") {
+          // A local desktop app: "online" means the collector reached it.
+          const online = !device.error && transportOnline !== false;
+          return {
+            online,
+            tone: online ? "online" : "offline",
+            text: online ? "运行中" : "未运行",
           };
         }
 
@@ -1128,6 +1159,20 @@
           return [first, escapeHtml(second)];
         }
 
+        if (kind === "app") {
+          const block = device.nekotrak || {};
+          const uptime = formatUptime(block.uptimeSec);
+          const first = uptime
+            ? `⏱️ 运行 ${escapeHtml(uptime)}`
+            : "🖥️ 本地应用";
+          const pet = block.pet && block.pet.name
+            ? `${block.pet.emoji || "🐾"} ${escapeHtml(block.pet.name)}`
+            : "";
+          const game = textOf(block.currentGame);
+          const second = game ? `🎮 ${escapeHtml(game)}` : "🎮 挂台中";
+          return [first, [second, pet].filter(Boolean).join(" · ")];
+        }
+
         // phone (ios / android): unchanged media + app lines.
         return [mediaLine(device), appLine(device)];
       }
@@ -1153,6 +1198,33 @@
           platform && platform !== kind && /^[a-z0-9-]+$/.test(platform) ? platform : "",
           state.online ? "" : "is-offline",
         ].filter(Boolean).join(" ");
+
+        const tracker = (device.nekotrak && device.nekotrak.trackerActive === true)
+          ? 'TRACKER 追踪中'
+          : 'TRACKER 已暂停';
+        const appWarns = Array.isArray(device.nekotrak && device.nekotrak.warns)
+          ? device.nekotrak.warns
+          : [];
+
+        if (kind === "app") {
+          // A desktop app has no battery: replacing the ring keeps the card
+          // from showing a meaningless "未知电量" gauge.
+          return `
+            <article class="${classes}">
+              <div class="device-head">
+                <span class="device-icon">${icon}</span>
+                <span class="device-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+                ${appWarns.length ? `<span class="chip warn" title="${escapeHtml(appWarns.join(' | '))}">⚠️ ${appWarns.length} 条提示</span>` : ""}
+              </div>
+              <div class="device-body app-body">
+                <span class="app-state">${tracker}</span>
+                ${statusChip(state)}
+              </div>
+              <div class="device-media">${detailA}</div>
+              <div class="device-app">${detailB}</div>
+            </article>
+          `;
+        }
 
         return `
           <article class="${classes}">

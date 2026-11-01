@@ -299,6 +299,25 @@
     .device-state.online { color: var(--green); }
     .device-state.online .dot { background: var(--green); box-shadow: 0 0 12px rgba(52, 211, 153, 0.8); }
 
+    .device-state.warn { color: var(--gold); }
+    .device-state.warn .dot { background: var(--gold); box-shadow: 0 0 12px rgba(246, 196, 83, 0.6); }
+
+    /* transport.degraded badge: "liveness only" has to be visible on screen,
+       not just present in the JSON. */
+    .degraded-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 7px;
+      border: 1px solid rgba(246, 196, 83, 0.28);
+      border-radius: 99px;
+      color: var(--gold);
+      background: rgba(246, 196, 83, 0.1);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
     .device-body {
       display: flex;
       align-items: center;
@@ -1002,6 +1021,292 @@
         return "var(--green)";
       }
 
+      // schema-3 platform -> card kind. Anything not listed still renders as a
+      // generic card, so a future collector can never blank the grid.
+      const KIND_BY_PLATFORM = {
+        ios: "phone",
+        android: "phone",
+        console: "console",
+        steam: "console",
+        macos: "node",
+        linux: "node",
+        ble: "ble",
+        windows: "app",
+      };
+
+      const PLATFORM_ICONS = {
+        ios: "📱",
+        android: "🤖",
+        console: "🎮",
+        steam: "🎮",
+        macos: "💻",
+        linux: "🐧",
+        ble: "📶",
+        windows: "🖥",
+      };
+
+      const PLATFORM_LABELS = {
+        ios: "IPHONE",
+        android: "ANDROID",
+        console: "CONSOLE",
+        steam: "STEAM",
+        macos: "MACOS",
+        linux: "LINUX",
+        ble: "BLE",
+        windows: "WINDOWS",
+      };
+
+      // transport.active -> readable channel name for the degraded badge.
+      const TRANSPORT_LABELS = {
+        lan: "LAN 探活",
+        tcp: "TCP 探活",
+        arp: "ARP 探活",
+        ping: "PING 探活",
+        usb: "USB",
+        "usb-wifi": "Wi-Fi 通道",
+        adb: "ADB",
+        "adb-wifi": "ADB Wi-Fi",
+        ssh: "SSH",
+        ble: "BLE",
+        process: "本地进程",
+        none: "仅探活",
+      };
+
+      const PLACEHOLDER_NAMES = new Set(["未知机型", "未知设备", "--"]);
+
+      function platformOf(device) {
+        return String((device && device.platform) || "").trim().toLowerCase();
+      }
+
+      function textOf(value) {
+        return typeof value === "string" ? value.trim() : "";
+      }
+
+      function kindOf(device) {
+        return KIND_BY_PLATFORM[platformOf(device)] || "unknown";
+      }
+
+      function deviceName(device) {
+        const candidates = [
+          device.alias,
+          device.displayName,
+          device.model,
+          device.console && device.console.name,
+          device.ble && device.ble.name,
+          device.node && device.node.hostname,
+        ];
+        for (const candidate of candidates) {
+          const text = textOf(candidate);
+          if (text && !PLACEHOLDER_NAMES.has(text)) {
+            return text;
+          }
+        }
+        const platform = platformOf(device);
+        return PLATFORM_LABELS[platform] || platform || "未知设备";
+      }
+
+      // Online/offline per card kind. A device-level error always wins over a
+      // stale platform flag, so a failed refresh never renders as "online".
+      function deviceState(device, kind) {
+        const transport = device.transport;
+        const transportOnline = transport && typeof transport.online === "boolean"
+          ? transport.online
+          : null;
+
+        if (kind === "ble") {
+          const block = device.ble || {};
+          const connected = !device.error && block.connected === true;
+          const online = !device.error && (connected || transportOnline === true);
+          if (connected) {
+            return { online: true, tone: "online", text: "已连接" };
+          }
+          return {
+            online,
+            tone: online ? "warn" : "",
+            text: textOf(block.statusText) || (online ? "已发现未连接" : "未发现"),
+          };
+        }
+
+        if (kind === "console" || kind === "node") {
+          const block = device[kind] || {};
+          const online = device.error
+            ? false
+            : typeof block.online === "boolean"
+              ? block.online
+              : transportOnline !== null ? transportOnline : true;
+          return {
+            online,
+            tone: online ? "online" : "",
+            text: online ? "在线" : (textOf(block.statusText) || "离线"),
+          };
+        }
+
+        if (kind === "app") {
+          const block = device.nekotrak || {};
+          const online = !device.error && (transportOnline !== false);
+          return { online, tone: online ? "online" : "", text: online ? "运行中" : "未运行" };
+        }
+
+        const online = device.error
+          ? false
+          : transportOnline !== null ? transportOnline : true;
+        return { online, tone: online ? "online" : "", text: online ? "在线" : "离线" };
+      }
+
+      function degradedChip(device) {
+        const transport = device.transport;
+        if (!transport || transport.degraded !== true) {
+          return "";
+        }
+        const active = textOf(transport.active).toLowerCase();
+        const label = TRANSPORT_LABELS[active] || (active ? active.toUpperCase() : "降级");
+        const detail = textOf(transport.detail);
+        const title = `降级：只拿到存活信息${detail ? `（${detail}）` : ""}`;
+        return `<span class="degraded-chip" title="${escapeHtml(title)}">⚠️ 降级 · ${escapeHtml(label)}</span>`;
+      }
+
+      function formatUptime(seconds) {
+        const value = Number(seconds);
+        if (!Number.isFinite(value) || value < 0) {
+          return "";
+        }
+        const days = Math.floor(value / 86400);
+        const hours = Math.floor((value % 86400) / 3600);
+        const minutes = Math.floor((value % 3600) / 60);
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+      }
+
+      // Footer rows per kind: an iPhone shows media/app, everything else shows
+      // the facts its own block actually carries.
+      function detailRows(device, kind) {
+        if (device.error) {
+          return [];
+        }
+
+        if (kind === "console") {
+          const block = device.console || {};
+          const transport = device.transport || {};
+          const type = textOf(block.type);
+          const method = textOf(block.method) || textOf(transport.detail) || textOf(transport.active);
+          const seen = formatTime(block.lastSeenAt);
+          const rows = [`🎮 ${escapeHtml(type ? type.toUpperCase() : "主机")} · ${escapeHtml(method ? method.toUpperCase() : "LAN")}`];
+          if (seen) {
+            rows.push(`上次在线：${escapeHtml(seen)}`);
+          }
+          return rows;
+        }
+
+        if (kind === "node") {
+          const block = device.node || {};
+          const rows = [];
+          const uptime = formatUptime(block.uptimeSeconds);
+          if (uptime) {
+            rows.push(`⏱️ 运行 ${escapeHtml(uptime)}`);
+          }
+          const hostname = textOf(block.hostname);
+          if (hostname) {
+            rows.push(`节点：${escapeHtml(hostname)}`);
+          }
+          rows.push(block.ssh === false ? "SSH 不可用（仅探活）" : "SSH 可用");
+          return rows;
+        }
+
+        if (kind === "ble") {
+          const block = device.ble || {};
+          const rows = [];
+          const heartRate = Number(block.heartRate);
+          if (Number.isFinite(heartRate) && heartRate > 0) {
+            rows.push(`❤️ ${Math.round(heartRate)} BPM`);
+          }
+          const rssi = Number(block.rssi);
+          if (Number.isFinite(rssi)) {
+            rows.push(`📶 RSSI ${Math.round(rssi)} dBm`);
+          }
+          const address = textOf(block.address);
+          if (address) {
+            rows.push(escapeHtml(address));
+          }
+          return rows;
+        }
+
+        if (kind === "app") {
+          const block = device.nekotrak || {};
+          const rows = [];
+          const uptime = formatUptime(block.uptimeSec);
+          if (uptime) {
+            rows.push(`⏱️ 运行 ${escapeHtml(uptime)}`);
+          }
+          rows.push(block.trackerActive === true ? "TRACKER 追踪中" : "TRACKER 已暂停");
+          const game = textOf(block.currentGame);
+          rows.push(game ? `🎮 ${escapeHtml(game)}` : "🎮 挂台中");
+          if (Array.isArray(block.warns) && block.warns.length) {
+            rows.push(`⚠️ ${escapeHtml(block.warns[0])}`);
+          }
+          return rows;
+        }
+
+        // phone: keep the original media + foreground rows.
+        const rows = [];
+        const media = device.mediaTitle
+          ? `🎵 ${device.mediaTitle}${device.mediaArtist ? ` — ${device.mediaArtist}` : ""}`
+          : "🎵 暂无播放";
+        rows.push(escapeHtml(media));
+        const foreground = device.foregroundAppName || device.foregroundApp;
+        if (foreground) {
+          rows.push(`前台：${escapeHtml(foreground)}`);
+        }
+        return rows;
+      }
+
+      // State memory feeds the transition toasts. The first render only seeds
+      // it: a page load must never announce "everything just went offline".
+      const KNOWN_DEVICE_STATE = new Map();
+
+      function announceTransitions(devices) {
+        const nameById = new Map();
+        const nextState = new Map();
+        devices.forEach((device) => {
+          const id = String(device.id || device.platform || "");
+          if (!id) {
+            return;
+          }
+          nameById.set(id, deviceName(device));
+          nextState.set(id, deviceState(device, kindOf(device)).online);
+        });
+
+        if (KNOWN_DEVICE_STATE.size === 0) {
+          nextState.forEach((online, id) => KNOWN_DEVICE_STATE.set(id, online));
+          return;
+        }
+
+        const changes = [];
+        nextState.forEach((online, id) => {
+          if (!KNOWN_DEVICE_STATE.has(id)) {
+            return; // a device that just appeared is not a transition
+          }
+          if (KNOWN_DEVICE_STATE.get(id) !== online) {
+            changes.push({ name: nameById.get(id) || id, online });
+          }
+        });
+        nextState.forEach((online, id) => KNOWN_DEVICE_STATE.set(id, online));
+
+        if (changes.length === 0) {
+          return;
+        }
+        if (changes.length === 1) {
+          const change = changes[0];
+          toast(`${change.name} ${change.online ? "已上线" : "已离线"}`, change.online ? "ok" : "bad");
+          return;
+        }
+        // One summary instead of a burst: a network blip can flip many devices
+        // in a single poll and a toast per device would bury the UI.
+        const up = changes.filter((change) => change.online).length;
+        const down = changes.length - up;
+        toast(`${changes.length} 台设备状态变化（上线 ${up} / 离线 ${down}）`, down > up ? "bad" : "ok");
+      }
+
       function renderDevices(payload) {
         const online = Boolean(payload && payload.online);
         const devices = (payload && payload.status && Array.isArray(payload.status.devices))
@@ -1022,37 +1327,55 @@
           ? devices
           : [
               {
+                id: "iphone",
                 platform: "ios",
                 displayName: "iPhone",
                 error: online ? "等待 iPhone 采集数据…" : "StatusCast API 未运行",
               },
               {
+                id: "android",
                 platform: "android",
                 displayName: "Android",
                 error: online ? "等待 Android 采集数据…" : "StatusCast API 未运行",
               },
             ];
 
+        if (online && devices.length) {
+          announceTransitions(devices);
+        }
+
         el.deviceGrid.innerHTML = displayDevices.map((device) => {
-          const level = Number.isFinite(Number(device.batteryLevel)) ? Number(device.batteryLevel) : null;
-          const hasData = !device.error && (level != null || device.model);
-          const name = device.displayName || device.model || "未知设备";
-          const platform = device.platform === "android" ? "ANDROID" : "IPHONE";
-          const icon = device.platform === "android" ? "🤖" : "📱";
+          const kind = kindOf(device);
+          const platform = platformOf(device);
+          const state = deviceState(device, kind);
+          // Number(null) is 0, so a device without a battery used to render as
+          // "0%". Treat null/undefined/"" as unknown before coercing.
+          const rawLevel = device.batteryLevel;
+          const level = rawLevel === null || rawLevel === undefined || rawLevel === ""
+            ? null
+            : (Number.isFinite(Number(rawLevel)) ? Number(rawLevel) : null);
+          const name = deviceName(device);
+          const icon = PLATFORM_ICONS[platform] || "❔";
+          const platformLabel = PLATFORM_LABELS[platform] || (platform ? platform.toUpperCase() : "UNKNOWN");
           const charging = device.isCharging === true;
           const color = batteryColor(level);
-          const media = device.mediaTitle
-            ? `🎵 ${device.mediaTitle}${device.mediaArtist ? ` — ${device.mediaArtist}` : ""}`
-            : "🎵 暂无播放";
-          const foreground = device.foregroundAppName || device.foregroundApp;
-          const modelText = [device.model, device.platform].filter(Boolean).join(" · ");
+          const rows = detailRows(device, kind);
+          const modelText = [device.model, platformLabel].filter(Boolean).join(" · ");
+          const chargeText = kind === "phone"
+            ? (charging ? "⚡ 充电中" : "🔋 未充电")
+            : (level == null ? "—" : (charging ? "⚡ 充电中" : "🔋 未充电"));
+          const chargeClass = (kind === "phone" || level != null) && charging ? "charging" : "";
+          const extraRows = [
+            degradedChip(device),
+            device.updatedAt && online ? `<span>更新时间：${escapeHtml(formatTime(device.updatedAt))}</span>` : "",
+          ].filter(Boolean);
 
           return `
-            <article class="device-card ${hasData ? "" : "is-offline"}">
+            <article class="device-card ${state.online ? "" : "is-offline"}">
               <div class="device-top">
-                <span class="device-platform">${icon} ${escapeHtml(platform)}</span>
-                <span class="device-state ${hasData ? "online" : ""}">
-                  <span class="dot"></span>${hasData ? "在线" : "离线"}
+                <span class="device-platform">${icon} ${escapeHtml(platformLabel)}</span>
+                <span class="device-state ${state.tone}">
+                  <span class="dot"></span>${escapeHtml(state.text)}
                 </span>
               </div>
               <div class="device-body">
@@ -1062,15 +1385,12 @@
                 <div class="device-main">
                   <h3 class="device-name">${escapeHtml(name)}</h3>
                   <p class="device-model">${escapeHtml(modelText || "型号未知")}</p>
-                  <span class="device-charge ${charging ? "charging" : ""}">
-                    ${charging ? "⚡ 充电中" : "🔋 未充电"}
-                  </span>
+                  <span class="device-charge ${chargeClass}">${chargeText}</span>
                 </div>
               </div>
               <div class="device-details">
-                <div><span>${escapeHtml(media)}</span></div>
-                ${foreground ? `<div><span>前台：${escapeHtml(foreground)}</span></div>` : ""}
-                ${device.updatedAt ? `<div><span>更新时间：${escapeHtml(formatTime(device.updatedAt))}</span></div>` : ""}
+                ${rows.map((row) => `<div><span>${row}</span></div>`).join("")}
+                ${extraRows.map((row) => `<div><span>${row}</span></div>`).join("")}
               </div>
               ${device.error ? `<div class="device-error">${escapeHtml(device.error)}</div>` : ""}
             </article>

@@ -19,10 +19,24 @@
 
 **Blocked by:** 01（复用同一套卡片分派与 chip 组件）
 
-**Status:** ready-for-agent
+**Status:** implemented（headless Edge 验证）
 
-- [ ] `platform:"windows"` 渲染为 🖥 专属卡，不再出现「未知平台」文案与 ❔ 图标
-- [ ] 卡片显示 tracker 状态、运行时长、当前游戏（空则「挂台中」）
-- [ ] 无电量时不出现「未知电量」圆环；`warns` 非空时有可见提示
-- [ ] `transport.active="process"` 不产生 `PROCESS` 这类生硬标签
-- [ ] 用合成 devices 截图验证，且 iOS/Android/console/node/ble 卡片不回归
+- [x] `platform:"windows"` 渲染为 🖥 专属卡，不再出现「未知平台」文案与 ❔ 图标
+- [x] 卡片显示 tracker 状态、运行时长、当前游戏（空则「挂台中」）
+- [x] 无电量时不出现「未知电量」圆环；`warns` 非空时有可见提示
+- [x] `transport.active="process"` 不产生 `PROCESS` 这类生硬标签
+- [x] 用合成 devices 截图验证，且 iOS/Android/console/node/ble 卡片不回归
+
+## Comments
+
+**2026-11-01 — 完成。**
+
+`windows` → 新 kind `app`：🖥 图标、`NekoTrak` 兜底名。这张卡**不复用电量骨架**——body 换成 `TRACKER 追踪中/已暂停` + `运行中` 状态胶囊，不再出现「未知电量」圆环（app 卡里既没有 `BATTERY` 标签也没有 `battery-value`）。
+
+底行两行：`⏱️ 运行 59m`，以及 `🎮 <游戏>` 或 `🎮 挂台中`，后面跟 `emoji + 宠物名`（`pet.lastEvent` 不拿出来，只有名字）。`warns` 非空时头部出现金色「⚠️ N 条提示」胶囊，`title` 里是全部条目；空数组不显示。`TRANSPORT_LABELS` 补了 `process: "本地进程"` 兜底。
+
+验证：真实 headless Edge + 合成 devices，12 项断言全绿（含「app 卡里没有电量环」「手机卡仍有电量环」「windows 不再走到 unknown 卡」）。截图 `G:\StatusCast\.tmp-b04\shot-widget-nekotrak.png`。
+
+**过程记录**：这张票最初派给 teammate 实现，但它汇报完成后磁盘上 `web/widget.html` 的 mtime 仍是 10:52（早于上一次提交），改动实际没落盘。由 lead 重做并验证。以后派工要检查文件 mtime 与 `git status` 再采信汇报。
+
+**未验证**：只有 Chromium；`pomodoro`、`nekotrak.source` 等票外字段没有展示；截图用的是合成数据，没起真 daemon。
