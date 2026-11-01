@@ -573,6 +573,22 @@ ${powershell.exe -NoProfile -Command "Get-Content -Raw 'G:\StatusCast\NekoTool\o
 .\scripts\write_to_obs.ps1 -Once
 ```
 
+### 那一行里有什么
+
+默认 `-Style presence`，内容固定三段，用 ` · ` 连接：
+
+```text
+🎮 ELDEN RING · 🔋 主力机 87%⚡ · 🍅 25:13
+```
+
+| 段 | 来源 | 规则 |
+| --- | --- | --- |
+| `🎮` | `platform:"windows"` 设备的 `nekotrak.currentGame` | 只有解析出 Steam 游戏名才算「在玩」；解析不到（前台是浏览器、桌面等）一律显示 **挂台中**，不会把 `chrome.exe` 这种进程名塞进 presence |
+| `🔋` | 手机设备 | **只认 `ios` / `android`**，按 `ios 且有电量` → `android 且有电量` → 任一手机 的顺序取第一台；MacBook、主机、BLE 都不会抢这一格。显示 `别名 电量%`，充电时末尾加 ⚡，读不到电量显示「未知」 |
+| `🍅` | `nekotrak.pomodoro.remainingSeconds` | 只有快照带番茄钟时才有这一段（见 `docs/NekoTrak接入实施计划.md` T5）；没有就整段省略，不留空占位 |
+
+`-Style full` 仍可输出原来的长行（CPU / 内存 / 网速 / 时间 / 插件），给 OBS 文本源用。区别是长行要跑插件，一轮约 8 秒；presence 行只读 `/status/`，一轮几百毫秒。
+
 ## 脚本参数
 
 ### pull_status.ps1
