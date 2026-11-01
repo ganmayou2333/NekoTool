@@ -70,7 +70,16 @@ function Format-DeviceText {
         $media = '🎵 暂无播放'
     }
 
-    return "$icon $name | $battery | $media"
+    # "只拿到存活信息" must be readable in the text, not just in the JSON:
+    # a phone served over the LAN fallback shows which channel answered.
+    $channel = ''
+    if ($null -ne $Device.transport -and $Device.transport.degraded -eq $true) {
+        $active = [string]$Device.transport.active
+        $label = if ($active) { $active.ToUpperInvariant() } else { '降级' }
+        $channel = " ($label)"
+    }
+
+    return "$icon $name$channel | $battery | $media"
 }
 
 function Get-MockPhoneText {
@@ -174,6 +183,70 @@ function Get-ConsoleTexts {
         }
 
         $lines += "🎮 $name $state"
+    }
+
+    return $lines
+}
+
+function Get-NodeTexts {
+    $lines = @()
+    if ($null -eq $script:StatusData) { return $lines }
+
+    foreach ($dev in @($script:StatusData.devices)) {
+        $platform = [string]$dev.platform
+        if ($platform -ne 'macos' -and $platform -ne 'linux') { continue }
+
+        $n = $dev.node
+        $icon = if ($platform -eq 'macos') { '💻' } else { '🐧' }
+        $name = if ($dev.displayName) { $dev.displayName }
+            elseif ($dev.model) { $dev.model }
+            else { $platform }
+
+        if ($dev.error -or ($null -ne $n -and $n.online -eq $false)) {
+            $state = if ($null -ne $n -and $n.statusText) { [string]$n.statusText } else { '离线' }
+        }
+        else {
+            $state = '在线'
+        }
+
+        $extra = ''
+        if ($null -ne $dev.batteryLevel) {
+            $bolt = if ($dev.isCharging -eq $true) { ' ⚡' } else { '' }
+            $extra += " · 🔋 $($dev.batteryLevel)%$bolt"
+        }
+        if ($null -ne $dev.transport -and $dev.transport.degraded -eq $true) {
+            $extra += ' · 仅探活'
+        }
+
+        $lines += "$icon $name $state$extra"
+    }
+
+    return $lines
+}
+
+function Get-BleTexts {
+    $lines = @()
+    if ($null -eq $script:StatusData) { return $lines }
+
+    foreach ($dev in @($script:StatusData.devices)) {
+        if ([string]$dev.platform -ne 'ble') { continue }
+
+        $b = $dev.ble
+        $name = if ($dev.displayName) { $dev.displayName }
+            elseif ($dev.model) { $dev.model }
+            elseif ($null -ne $b -and $b.name) { $b.name }
+            else { 'BLE 设备' }
+
+        if ($dev.error) { $state = '错误' }
+        elseif ($null -ne $b -and $b.connected -eq $true) { $state = '已连接' }
+        elseif ($null -ne $b -and $b.statusText) { $state = [string]$b.statusText }
+        else { $state = '未发现' }
+
+        $extra = ''
+        if ($null -ne $dev.batteryLevel) { $extra += " · 🔋 $($dev.batteryLevel)%" }
+        if ($null -ne $b -and $null -ne $b.heartRate) { $extra += " · ❤️ $($b.heartRate) BPM" }
+
+        $lines += "📶 $name $state$extra"
     }
 
     return $lines
@@ -332,6 +405,8 @@ $parts = @(
     "🕐 $clock"
 )
 $parts += Get-ConsoleTexts
+$parts += Get-NodeTexts
+$parts += Get-BleTexts
 $parts += $pluginTexts
 
 Write-Output ($parts -join ' | ')
