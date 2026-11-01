@@ -663,7 +663,7 @@
       // Configuration
       // -------------------------------------------------------
       const params = new URLSearchParams(location.search);
-      const API_URL = params.get("api") || "http://localhost:5099/status/";
+      const API_URL = params.get("api") || params.get("url") || "http://localhost:5099/status/";
       const POLL_MS = 2000;
       const SYSTEM_MS = 1400;
 
