@@ -35,9 +35,6 @@ StatusCast release it targets.
   `obs_status.txt` with a timestamped backup, a `-WhatIfMode` preview and
   idempotent re-runs. Edits raw JSON text so NekoTrak's deeply nested settings
   survive.
-- `scripts/probe_nekotrak_cdp.py`: opt-in, read-only CDP probe for NekoTrak's
-  pomodoro state (the plaintext data root has none — every database is
-  encrypted). Reports what the page exposes instead of guessing IPC names.
 - `scripts/ultimate_status.ps1`: one row per Mac/Linux node and per BLE
   peripheral, plus a readable channel marker (`(LAN)`) when a phone was served
   by a fallback transport.

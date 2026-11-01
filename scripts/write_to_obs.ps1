@@ -13,8 +13,9 @@
     -Style presence (default)
         The Discord presence line, built straight from /status/:
             🎮 <game or 挂台中> · 🔋 <name> <level>%[⚡] · 🍅 <mm:ss>
-        The pomodoro segment only appears once the snapshot carries
-        nekotrak.pomodoro (ticket 06); until then the line has two segments.
+        The pomodoro segment is not implemented: ticket 06 was closed without
+        a working source (see docs/NekoTrak接入实施计划.md), so the line is
+        always the two segments above.
 
     -Style full
         Delegates to ultimate_status.ps1 for the long OBS line (CPU / memory /
@@ -166,17 +167,10 @@ function Get-PresenceText {
         }
     }
 
+    # No pomodoro segment: the remaining time is only reachable from inside the
+    # running app, both debug-port and UI-Automation routes were ruled out, and
+    # ticket 06 was closed without a source (see docs/NekoTrak接入实施计划.md).
     $parts = @("🎮 $game", $battery)
-
-    # Pomodoro lands with ticket 06; until the snapshot carries it, no segment.
-    if ($null -ne $nekotrak -and $null -ne $nekotrak.nekotrak -and
-        $null -ne $nekotrak.nekotrak.pomodoro -and
-        $null -ne $nekotrak.nekotrak.pomodoro.remainingSeconds) {
-        $seconds = [int]$nekotrak.nekotrak.pomodoro.remainingSeconds
-        if ($seconds -ge 0) {
-            $parts += ('🍅 {0:d2}:{1:d2}' -f [int][Math]::Floor($seconds / 60), ($seconds % 60))
-        }
-    }
 
     return ($parts -join ' · ')
 }
